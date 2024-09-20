@@ -335,6 +335,7 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
               // Call createCombinations with the current factor and multiply with factors
               createCombinations(eitherLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor);
               eitherResult.push((tempArray));
+              removeDuplicateArrays(eitherResult);
             });      
             result["Either"].push((eitherResult));       
           }
@@ -353,6 +354,7 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
               // Call createCombinations with the current factor and multiply with factors
               createCombinations(addLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor);
               addResult.push((tempArray));
+              removeDuplicateArrays(addResult);
             }); 
           }
           result["Add"].push((addResult));
