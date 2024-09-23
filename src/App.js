@@ -334,17 +334,20 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
               }
               // Call createCombinations with the current factor and multiply with factors
               createCombinations(eitherLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor);
-              eitherResult.push((tempArray));
-              removeDuplicateArrays(eitherResult);
-            });      
-            result["Either"].push((eitherResult));       
+              
+              // removeDuplicateArrays(eitherResult);
+            }); 
+            
+            eitherResult.push((tempArray));     
+            
           }
+          result["Either"].push((eitherResult));
           // result["Either"].push(removeDuplicates(eitherResult));
         } else if (newLoadCases.type === "Add") {
           result["Add"] = result["Add"] || [];
           const addResult = [];
           for (let factor = 1; factor <= 5; factor++) {    // Loop through factors from 1 to 5
-            const tempArray = [];  // Create a new empty array at the start of each loop
+            const tempArray_add = [];  // Create a new empty array at the start of each loop
             
             newLoadCases.loadCases.forEach(addLoadCase => {
               const currentFactorValue = addLoadCase[`factor${factor}`];
@@ -352,10 +355,13 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                 return;  // Skip the undefined factor
               }  
               // Call createCombinations with the current factor and multiply with factors
-              createCombinations(addLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor);
-              addResult.push((tempArray));
-              removeDuplicateArrays(addResult);
+              createCombinations(addLoadCase, strengthCombination, combinations, loadNames, tempArray_add, currentFactorValue * factors, factor);
+              
+              // removeDuplicateArrays(addResult);
             }); 
+           
+            addResult.push(tempArray_add);
+            
           }
           result["Add"].push((addResult));
           // result["Add"].push(removeDuplicates(addResult));
@@ -417,77 +423,96 @@ function convertToObj(result, parentKey = '') {
   return finalObj;
 }
 function combineAddEither(inputObj) {
-  const resultArray = []; // Initialize an empty array
   let eitherArray = []; // Array for "Either" type
-  let addObj = [] ; // Object for "Add" type
+  let addObj = []; // Array for "Add" type
 
   // Recursive helper function to process each object
-  function processObject(obj, parentKey = null, parentObj = null) {
-    let either = [];
-    let add = [];
-    let newObj;
+  function processObject(obj, parentKey = null) {
+    if (Array.isArray(obj)) {
+      // Loop through the array itself
+      obj.forEach((value) => {
+        // Check if the current item is an object
+        if (typeof value === 'object' && value !== null) {
+          // Process the key-value pairs inside the object
+          processKeyValuePairs(value, parentKey);
+        }
+      });
+    } else {
+      // If input is not an array, process it as a key-value pair object
+      processKeyValuePairs(obj, parentKey);
+    }
+  }
+
+  // Function to process key-value pairs
+  function processKeyValuePairs(obj, parentKey) {
     // Loop through each key-value pair in the object
     for (const [key, value] of Object.entries(obj)) {
-      // First check: if key is neither 'Add' nor 'Either'
-      if (key !== 'Add' && key !== 'Either') {
-        // Second check: ensure the value itself does not have 'Add' or 'Either' keys
-        const valueHasAddOrEither = Object.keys(value).some(k => k === 'Add' || k === 'Either');
+      // Only store the key if it's "Add" or "Either"
+      if (key === 'Add' || key === 'Either') {
+        parentKey = key;
+      }
 
-        if (!valueHasAddOrEither) {
-          // If key is neither "Add" nor "Either", and value also does not contain those keys
-          if (parentKey === 'Either') {
-            // Create an object for this value and push it into the eitherArray
-            newObj = {
-              loadCaseName: value[0].loadCaseName,
-              sign: value[0].sign,
-              factor:  value[0].factor,
-            };
+      // Check if the value is an array
+      if (Array.isArray(value)) {
+        let temp = []; // Temporary array to hold processed objects
 
-            // Dynamically add all factors from 1 to 5
-            // for (let factor = 1; factor <= 5; factor++) {
-            //   const factorKey = `factor${factor}`;
-            //   if (value[0][factorKey] !== undefined) {
-            //     newObj[factorKey] = value[0][factorKey]; // Add factor to the new object
-            //   }
-            // }
-            either.push(newObj);
-            eitherArray.push(either);
-          } else if (parentKey === 'Add') {
-            // Create an object for this value and push it into the Add object's array
-            newObj = {
-              loadCaseName: value[0].loadCaseName,
-              sign: value[0].sign,
-              factor: value[0].factor
-            };
+        // Loop through each array in the value
+        value.forEach((subArrayOrItem) => {
+          if (Array.isArray(subArrayOrItem)) {
+            // If the current value is a nested array, loop through the inner array
+           
+            subArrayOrItem.forEach((item) => {
+              if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
+                // Create a new object and loop through each key-value pair of the item
+                const newObj = {};
+                
+                // Loop through each property of the object
+                for (const [itemKey, itemValue] of Object.entries(item)) {
+                  newObj[itemKey] = itemValue; // Add each property to the new object
+                }
 
-            // Dynamically add all factors from 1 to 5
-            // for (let factor = 1; factor <= 5; factor++) {
-            //   const factorKey = `factor${factor}`;
-            //   if (value[0][factorKey] !== undefined) {
-            //     newObj[factorKey] = value[0][factorKey]; // Add factor to the new object
-            //   }
-            // }
-            add.push(newObj); 
-            addObj.push(add);
-          }
+                // Push the new object into the temp array
+                temp.push(newObj);
+              }
+            });
           
-        } else {
-          // If the value contains 'Add' or 'Either', recursively call processObject
-          processObject(value, parentKey, obj); // Call with current parent key and object
+          } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
+            // If subArrayOrItem is a direct object (not an array)
+            const newObj = {};
+
+            // Loop through each property of the subArrayOrItem object
+            for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
+              newObj[itemKey] = itemValue; // Add each property to the new object
+            }
+
+            // Push the new object into the temp array
+            temp.push(newObj);
+          } else {
+            // If the value is not an object, call processObject recursively
+            processObject(subArrayOrItem, parentKey);
+          }
+        });
+
+        // After processing the entire array, push the temp array into eitherArray or addObj
+        if (parentKey === 'Either') {
+          eitherArray.push(temp);
+        } else if (parentKey === 'Add') {
+          addObj.push(temp);
         }
-      } else {
-        // If the key is "Add" or "Either", recursively process the inner object
-        processObject(value, key, obj); // Call the function recursively with the current key as the parent
+      } else if (typeof value === 'object' && value !== null) {
+        // If the value is another object, recursively call processObject
+        processObject(value, key); // Pass the current key as the new parentKey
       }
     }
   }
-  // Start processing the input object
+
+  // Function to remove duplicates from arrays of objects
   function removeDuplicates(arr) {
     const uniqueSet = new Set(arr.map(item => JSON.stringify(item)));
     return Array.from(uniqueSet).map(item => JSON.parse(item));
   }
 
-  // Start processing the input object
+  // Start processing the input object (assuming it's an array)
   processObject(inputObj);
 
   // Remove duplicates from eitherArray and addObj
@@ -496,6 +521,9 @@ function combineAddEither(inputObj) {
 
   return { eitherArray, addObj };
 }
+
+
+
 
 function findStrengthCombinations(combinations) {
   return combinations.filter(combo => combo.active === "Strength");
