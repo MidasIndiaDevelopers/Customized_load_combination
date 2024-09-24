@@ -452,7 +452,7 @@ function combineAddEither(inputObj) {
         parentKey = key;
       }
 
-      // Check if the value is an array
+      // Check if the value is an array or an object
       if (Array.isArray(value)) {
         let temp = []; // Temporary array to hold processed objects
 
@@ -460,22 +460,29 @@ function combineAddEither(inputObj) {
         value.forEach((subArrayOrItem) => {
           if (Array.isArray(subArrayOrItem)) {
             // If the current value is a nested array, loop through the inner array
-           
             subArrayOrItem.forEach((item) => {
               if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
                 // Create a new object and loop through each key-value pair of the item
                 const newObj = {};
-                
+
                 // Loop through each property of the object
                 for (const [itemKey, itemValue] of Object.entries(item)) {
-                  newObj[itemKey] = itemValue; // Add each property to the new object
+                 // Add each property to the new object
+
+                  // If item contains "Add" or "Either", process it again
+                  if (itemKey === 'Add' || itemKey === 'Either') {
+                    processKeyValuePairs(item, parentKey); // Recursive call
+                  }
+                  else {
+                    newObj[itemKey] = itemValue; 
+                  }
                 }
 
                 // Push the new object into the temp array
                 temp.push(newObj);
               }
             });
-          
+
           } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
             // If subArrayOrItem is a direct object (not an array)
             const newObj = {};
@@ -483,6 +490,11 @@ function combineAddEither(inputObj) {
             // Loop through each property of the subArrayOrItem object
             for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
               newObj[itemKey] = itemValue; // Add each property to the new object
+
+              // If the object contains "Add" or "Either", process it again
+              if (itemKey === 'Add' || itemKey === 'Either') {
+                processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
+              }
             }
 
             // Push the new object into the temp array
@@ -521,8 +533,6 @@ function combineAddEither(inputObj) {
 
   return { eitherArray, addObj };
 }
-
-
 
 
 function findStrengthCombinations(combinations) {
