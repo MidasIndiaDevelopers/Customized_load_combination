@@ -523,17 +523,106 @@ function combineAddEither(inputObj) {
     const uniqueSet = new Set(arr.map(item => JSON.stringify(item)));
     return Array.from(uniqueSet).map(item => JSON.parse(item));
   }
+  function arraysAreEqual(arr1, arr2) {
+    if (arr1.length !== arr2.length) return false;
+    for (let i = 0; i < arr1.length; i++) {
+        if (arr1[i] !== arr2[i]) return false;
+    }
+    return true;
+}
 
+function multipleFactor(input) {
+    const addObj = []; 
+
+    input.forEach((subArray, subArrayIndex) => {
+        // Iterate over subArray if it's an array and not empty
+        if (Array.isArray(subArray) && subArray.length > 0) {
+            const loadCaseNames = []; // Reset for current subArray
+            let tempArray = []; // Temporary array to group current subArray results
+            let additionalArray = []; // Additional array to collect results from the current iteration
+
+            // Loop through each item in the subArray
+            subArray.forEach((item) => {
+                const temp = []; // Temporary array for storing the individual item's properties
+
+                if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
+                    // Loop through each key in the item object
+                    Object.keys(item).forEach((key) => {
+                        // Check if the key contains the loadCaseName, sign, and factor properties
+                        if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
+                            loadCaseNames.push(item[key].loadCaseName); // Collect loadCaseName
+                            
+                            // Push the object with its properties to temp
+                            temp.push({
+                                loadCaseName: item[key].loadCaseName,
+                                sign: item[key].sign,
+                                factor: item[key].factor,
+                            });
+                        }
+                    });
+                }
+                additionalArray.push(temp); // Store temp for the current item
+            });
+
+            tempArray.push(additionalArray); // Store all items' results for current subArray
+
+            // Compare with the next subArray (if it exists)
+            if (subArrayIndex[0] < input.length - 1) {
+                const nextSubArray = input[subArrayIndex[0] + 1];
+                const nextLoadCaseNames = [];
+
+                nextSubArray.forEach((nextItem) => {
+                    if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
+                        Object.keys(nextItem).forEach((key) => {
+                            // Check if the key contains the loadCaseName property
+                            if (nextItem[key] && nextItem[key].loadCaseName) {
+                                nextLoadCaseNames.push(nextItem[key].loadCaseName); // Collect loadCaseName
+                            }
+                        });
+                    }
+                });
+
+                // Compare loadCaseNames of current and next subArray
+                if (arraysAreEqual(loadCaseNames, nextLoadCaseNames)) {
+                    // If loadCaseNames match, merge the current and next subarrays into additionalArray
+                    nextSubArray.forEach((nextItem) => {
+                        if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
+                            Object.keys(nextItem).forEach((key) => {
+                                // Check if the key contains the loadCaseName, sign, and factor properties
+                                if (nextItem[key] && nextItem[key].loadCaseName && nextItem[key].sign && nextItem[key].factor) {
+                                    additionalArray.push({
+                                        loadCaseName: nextItem[key].loadCaseName,
+                                        sign: nextItem[key].sign,
+                                        factor: nextItem[key].factor,
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+            addObj.push(tempArray); // Store the results for the current subArray
+        }
+    });
+
+    return addObj; // Return the final grouped array
+}
+
+
+  
   // Start processing the input object (assuming it's an array)
   processObject(inputObj);
 
   // Remove duplicates from eitherArray and addObj
   eitherArray = removeDuplicates(eitherArray);
   addObj = removeDuplicates(addObj);
+  console.log(eitherArray);
+  console.log(addObj);
+  eitherArray = multipleFactor(eitherArray);
+  addObj = multipleFactor(addObj);
 
   return { eitherArray, addObj };
 }
-
 
 function findStrengthCombinations(combinations) {
   return combinations.filter(combo => combo.active === "Strength");
@@ -802,7 +891,7 @@ useEffect(() => {
       loadCase.loadName !== '' ||
       loadCase.sign !== '' ||
       loadCase.factor1 !== '' ||
-      loadCase.factor2 !== '' ||
+      loadCase.factor2 !== '' ||                  
       loadCase.factor3 !== '' ||
       loadCase.factor4 !== '' ||
       loadCase.factor5 !== ''
