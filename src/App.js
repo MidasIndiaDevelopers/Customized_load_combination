@@ -277,106 +277,111 @@ function handleSignCases(sign, loadCase, factor) {
   }
   return result;
 }
-function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, factors,factor) {
-  // Initialize an array to store the factor details for each iteration
-  // let factorArray = [];
+function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, factors, factor, sign) {
+  if (loadNames.includes(loadCases.loadCaseName)) {
+    // Update the loadCaseObj with sign
+    const loadCaseObj = {
+      loadCaseName: loadCases.loadCaseName,
+      sign: sign,
+      factor: factors
+    };
 
-  // Loop through the factors array and ensure no undefined factors are processed
-  // factors.forEach(({ factor, value }) => {
-  //   // Nullify the factorArray at the start of each loop
-  //   factorArray = [];
+    result.push(loadCaseObj);
+  } else {
+    const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
+    const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
 
-  //   if (value === undefined || factor === undefined) {
-  //     // Skip this factor if it's undefined
-  //     console.warn(`Skipping undefined factor for loadCase: ${loadCases.loadCaseName}`);
-  //     return;
-  //   }
+    if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
+      if (newLoadCases.type === "Either") {
+        result["Either"] = result["Either"] || [];
+        const eitherResult = [];
 
-    // Check if the loadCaseName is present in loadNames
-    if (loadNames.includes(loadCases.loadCaseName)) {
-      // Create an object with loadCaseName, sign, and corresponding factor
-      const loadCaseObj = {
-        loadCaseName: loadCases.loadCaseName,
-        sign: loadCases.sign,
-        factor: factors
-      };
+        for (let factor = 1; factor <= 5; factor++) {
+          const tempArray = [];
+          newLoadCases.loadCases.forEach(eitherLoadCase => {
+            const currentFactorValue = eitherLoadCase[`factor${factor}`];
+            if (currentFactorValue === undefined) return;
 
-      // Add each factor to loadCaseObj
-     // Dynamically add the factor as a key and its calculated value
-     
-     // Multiply the loadCases factor by the factor value
-     result.push(loadCaseObj); // Push the object into the factorArray
-      // Push to result based on its type (array or object)
-      // if (Array.isArray(result)) {
-      //   result.push(loadCaseObj); // If result is an array, push the object
-      // } else if (typeof result === 'object') {
-      //   result[loadCases.loadCaseName] = loadCaseObj; // Add/replace property in the result object
-      // } else {
-      //   console.error('Result is neither an array nor an object');
-      // }
-    } else {
-      // If loadCaseName is not in loadNames, search for it in combinations array
-      const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-      const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
+            // Multiply signs as well as factors
+            const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
+            createCombinations(eitherLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor, newSign);
+          });
 
-      if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
-        // Handle "Either" and "Add" types similarly as before
-        if (newLoadCases.type === "Either") {
-          result["Either"] = result["Either"] || [];
-          const eitherResult = [];  
-          for (let factor = 1; factor <= 5; factor++) {  // Loop through factors from 1 to 5
-          const tempArray = []; 
-            // Now, perform the forEach operation inside the loop
-            newLoadCases.loadCases.forEach(eitherLoadCase => {
-              const currentFactorValue = eitherLoadCase[`factor${factor}`]; // Get the current factor value
-              if (currentFactorValue === undefined) {
-                return;  // Skip the undefined factor
-              }
-              // Call createCombinations with the current factor and multiply with factors
-              createCombinations(eitherLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor);
-              
-              // removeDuplicateArrays(eitherResult);
-            }); 
-            
-            eitherResult.push((tempArray));     
-            
-          }
-          result["Either"].push((eitherResult));
-          // result["Either"].push(removeDuplicates(eitherResult));
-        } else if (newLoadCases.type === "Add") {
-          result["Add"] = result["Add"] || [];
-          const addResult = [];
-          for (let factor = 1; factor <= 5; factor++) {    // Loop through factors from 1 to 5
-            const tempArray_add = [];  // Create a new empty array at the start of each loop
-            
-            newLoadCases.loadCases.forEach(addLoadCase => {
-              const currentFactorValue = addLoadCase[`factor${factor}`];
-              if (currentFactorValue === undefined) {
-                return;  // Skip the undefined factor
-              }  
-              // Call createCombinations with the current factor and multiply with factors
-              createCombinations(addLoadCase, strengthCombination, combinations, loadNames, tempArray_add, currentFactorValue * factors, factor);
-              
-              // removeDuplicateArrays(addResult);
-            }); 
-           
-            addResult.push(tempArray_add);
-            
-          }
-          result["Add"].push((addResult));
-          // result["Add"].push(removeDuplicates(addResult));
+          eitherResult.push(tempArray);
         }
-      } else {
-        console.error(`Load case ${loadCases.loadCaseName} not found in combinations.`);   
+
+        result["Either"].push(eitherResult);
+      } else if (newLoadCases.type === "Add") {
+        result["Add"] = result["Add"] || [];
+        const addResult = [];
+
+        for (let factor = 1; factor <= 5; factor++) {
+          const tempArray_add = [];
+
+          newLoadCases.loadCases.forEach(addLoadCase => {
+            const currentFactorValue = addLoadCase[`factor${factor}`];
+            if (currentFactorValue === undefined) return;
+
+            // Multiply signs as well as factors
+            const newSign = multiplySigns(sign, addLoadCase.sign || '+');
+            createCombinations(addLoadCase, strengthCombination, combinations, loadNames, tempArray_add, currentFactorValue * factors, factor, newSign);
+          });
+
+          addResult.push(tempArray_add);
+        }
+
+        result["Add"].push(addResult);
       }
+    } else {
+      console.error(`Load case ${loadCases.loadCaseName} not found in combinations.`);
     }
-    // Push factorArray into the result after processing all factors
-  // result.push(factorArray);
-  // console.log(result);
-  console.log((result));
-  
-  return result; 
+  }
+
+  console.log(result);
+  return result;
 }
+function multiplySigns(sign1, sign2) {
+  // Handle basic sign multiplication
+  if ((sign1 === '+' && sign2 === '+') || (sign2 === '+' && sign1 === '+')) return '+';
+  if ((sign1 === '+' && sign2 === '-') || (sign2 === '+' && sign1 === '-')) return '-';
+  if ((sign1 === '-' && sign2 === '+') || (sign2 === '-' && sign1 === '+')) return '-';
+  if ((sign1 === '-' && sign2 === '-') || (sign2 === '-' && sign1 === '-')) return '+';
+
+  // Handle combinations with +,-
+  if ((sign1 === '+,-' && sign2 === '+') || (sign2 === '+,-' && sign1 === '+')) return '+,-';
+  if ((sign1 === '+,-' && sign2 === '-') || (sign2 === '+,-' && sign1 === '-')) return '-,+';
+  if ((sign1 === '-' && sign2 === '+,-') || (sign2 === '-' && sign1 === '+,-')) return '-,+';
+  if ((sign1 === '+,-' && sign2 === '+,-')) return '+,-';
+
+  // Handle combinations with -,+
+  if ((sign1 === '-,+' && sign2 === '+') || (sign2 === '-,+' && sign1 === '+')) return '-,+';
+  if ((sign1 === '-,+' && sign2 === '-') || (sign2 === '-,+' && sign1 === '-')) return '+,-';
+  if ((sign1 === '+' && sign2 === '-,+') || (sign2 === '+' && sign1 === '-,+')) return '+,-';
+  if ((sign1 === '-' && sign2 === '-,+') || (sign2 === '-' && sign1 === '-,+')) return '+,-';
+  if ((sign1 === '+,-' && sign2 === '-,+') || (sign2 === '+,-' && sign1 === '-,+')) return '+,-,-,+';
+  if ((sign1 === '-,+' && sign2 === '+,-') || (sign2 === '-,+' && sign1 === '+,-')) return '+,-,-,+';
+  if ((sign1 === '-,+' && sign2 === '-,+')) return '-,+';
+
+  // Handle combinations with ±
+  if ((sign1 === '±' && sign2 === '+') || (sign2 === '±' && sign1 === '+')) return '±'; // ± * + = ±
+  if ((sign1 === '±' && sign2 === '-') || (sign2 === '±' && sign1 === '-')) return '∓'; // ± * - = ∓
+  if ((sign1 === '±' && sign2 === '+,-') || (sign2 === '±' && sign1 === '+,-')) return '±'; // ± * +,- = ±
+  if ((sign1 === '±' && sign2 === '-,+') || (sign2 === '±' && sign1 === '-,+')) return '∓'; // ± * -,+ = ∓
+  if (sign1 === '±' && sign2 === '±') return '±'; // ± * ± = ±
+  if (sign1 === '±' && sign2 === '∓') return '∓'; // ± * ∓ = ∓
+
+  // Handle combinations with ∓ (inverse of ±)
+  if ((sign1 === '∓' && sign2 === '+') || (sign2 === '∓' && sign1 === '+')) return '∓'; // ∓ * + = ∓
+  if ((sign1 === '∓' && sign2 === '-') || (sign2 === '∓' && sign1 === '-')) return '±'; // ∓ * - = ±
+  if ((sign1 === '∓' && sign2 === '+,-') || (sign2 === '∓' && sign1 === '+,-')) return '∓'; // ∓ * +,- = ∓
+  if ((sign1 === '∓' && sign2 === '-,+') || (sign2 === '∓' && sign1 === '-,+')) return '±'; // ∓ * -,+ = ±
+  if (sign1 === '∓' && sign2 === '±') return '∓'; // ∓ * ± = ∓
+  if (sign1 === '∓' && sign2 === '∓') return '±'; // ∓ * ∓ = ±
+
+  // Default to '+' if no match found
+  return '+';
+}
+
 
 function removeDuplicateArrays(arrayOfArrays) {
    // Stringify each array for comparison
@@ -532,84 +537,132 @@ function combineAddEither(inputObj) {
 }
 
 function multipleFactor(input) {
-    const addObj = []; 
+  const addObj = [];
+  
+  input.forEach((subArray, subArrayIndex) => {
+      let tempArray = [];  // Temporary array for the current subArray
+      let loadCaseNames = [];  // Store the loadCaseName of the current object
+      let additionalArray = [];  // Additional array to collect matches
 
-    input.forEach((subArray, subArrayIndex) => {
-        // Iterate over subArray if it's an array and not empty
-        if (Array.isArray(subArray) && subArray.length > 0) {
-            const loadCaseNames = []; // Reset for current subArray
-            let tempArray = []; // Temporary array to group current subArray results
-            let additionalArray = []; // Additional array to collect results from the current iteration
+      // Process each item inside the subArray
+      subArray.forEach((item, itemIndex) => {
+          if (item === null) return;  // Skip already processed items
+          tempArray = [];
+          let temp = [];  // Temporary array for storing the current item's properties
 
-            // Loop through each item in the subArray
-            subArray.forEach((item) => {
-                const temp = []; // Temporary array for storing the individual item's properties
+          // Check if item is an object and has the necessary properties
+          if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
+              Object.keys(item).forEach((key) => {
+                  // Extract loadCaseName, sign, and factor properties
+                  if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
+                      loadCaseNames.push(item[key].loadCaseName);  // Collect loadCaseName
 
-                if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
-                    // Loop through each key in the item object
-                    Object.keys(item).forEach((key) => {
-                        // Check if the key contains the loadCaseName, sign, and factor properties
-                        if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
-                            loadCaseNames.push(item[key].loadCaseName); // Collect loadCaseName
-                            
-                            // Push the object with its properties to temp
-                            temp.push({
-                                loadCaseName: item[key].loadCaseName,
-                                sign: item[key].sign,
-                                factor: item[key].factor,
-                            });
-                        }
-                    });
-                }
-                additionalArray.push(temp); // Store temp for the current item
-            });
+                      // Store the current item in temp
+                      temp.push({
+                          loadCaseName: item[key].loadCaseName,
+                          sign: item[key].sign,
+                          factor: item[key].factor,
+                      });
+                  }
+              });
+          }
 
-            tempArray.push(additionalArray); // Store all items' results for current subArray
+          // Store all loadCaseNames of the current item in tempArray
+          tempArray.push(temp);
 
-            // Compare with the next subArray (if it exists)
-            if (subArrayIndex[0] < input.length - 1) {
-                const nextSubArray = input[subArrayIndex[0] + 1];
-                const nextLoadCaseNames = [];
+          // Now compare the current `loadCaseNames` with the next item in the subArray (if available)
+          for (let nextIndex = itemIndex + 1; nextIndex < subArray.length; nextIndex++) {
+              let nextItem = subArray[nextIndex];
+              if (nextItem === null) continue;  // Skip already processed items
+              
+              let loadCaseName_temp = [];
 
-                nextSubArray.forEach((nextItem) => {
-                    if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
-                        Object.keys(nextItem).forEach((key) => {
-                            // Check if the key contains the loadCaseName property
-                            if (nextItem[key] && nextItem[key].loadCaseName) {
-                                nextLoadCaseNames.push(nextItem[key].loadCaseName); // Collect loadCaseName
-                            }
-                        });
-                    }
-                });
+              // Check if nextItem is valid
+              if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
+                  Object.keys(nextItem).forEach((nextKey) => {
+                      // Extract and store next item's loadCaseName
+                      if (nextItem[nextKey] && nextItem[nextKey].loadCaseName) {
+                          loadCaseName_temp.push(nextItem[nextKey].loadCaseName);
+                      }
+                  });
+              }
 
-                // Compare loadCaseNames of current and next subArray
-                if (arraysAreEqual(loadCaseNames, nextLoadCaseNames)) {
-                    // If loadCaseNames match, merge the current and next subarrays into additionalArray
-                    nextSubArray.forEach((nextItem) => {
-                        if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
-                            Object.keys(nextItem).forEach((key) => {
-                                // Check if the key contains the loadCaseName, sign, and factor properties
-                                if (nextItem[key] && nextItem[key].loadCaseName && nextItem[key].sign && nextItem[key].factor) {
-                                    additionalArray.push({
-                                        loadCaseName: nextItem[key].loadCaseName,
-                                        sign: nextItem[key].sign,
-                                        factor: nextItem[key].factor,
-                                    });
-                                }
-                            });
-                        }
-                    });
-                }
-            }
-            addObj.push(tempArray); // Store the results for the current subArray
-        }
-    });
+              // Compare the current loadCaseName with the next item's loadCaseName
+              if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
+                  // If loadCaseNames match, push both into additionalArray
+                  let matchArray = [];
+                  // matchArray.push(tempArray)
+                  // matchArray.push(temp);
+                  temp = []; // Clear temp for the next item
 
-    return addObj; // Return the final grouped array
+                  // Push matching nextItem into temp, then push temp into matchArray
+                  Object.keys(nextItem).forEach((nextKey) => {
+                      if (nextItem[nextKey] && nextItem[nextKey].loadCaseName && nextItem[nextKey].sign && nextItem[nextKey].factor) {
+                          temp.push({
+                              loadCaseName: nextItem[nextKey].loadCaseName,
+                              sign: nextItem[nextKey].sign,
+                              factor: nextItem[nextKey].factor,
+                          });
+                      }
+                  });
+                  tempArray.push(temp);
+                    // Push the matched items into the additional array
+
+                  subArray[nextIndex] = null;  // Mark the nextItem as processed
+              }
+          }
+          // additionalArray.push(tempArray);
+          // Now process the next sub-array if available, and compare with the current item
+          for (let nextSubArrayIndex = subArrayIndex + 1; nextSubArrayIndex < input.length; nextSubArrayIndex++) {
+              let nextSubArray = input[nextSubArrayIndex];
+
+              nextSubArray.forEach((nextItem, nextItemIndex) => {
+                  if (nextItem === null) return;  // Skip already processed items
+
+                  let loadCaseName_temp = [];
+
+                  if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
+                      Object.keys(nextItem).forEach((nextKey) => {
+                          if (nextItem[nextKey] && nextItem[nextKey].loadCaseName) {
+                              loadCaseName_temp.push(nextItem[nextKey].loadCaseName);
+                          }
+                      });
+                  }
+
+                  // Compare the current loadCaseNames with the next sub-array item
+                  if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
+                      // If they match, add both to additionalArray
+                      let matchArray = [];
+                      // matchArray.push(temp);
+                      temp = [];  // Clear temp for the next item
+
+                      Object.keys(nextItem).forEach((nextKey) => {
+                          if (nextItem[nextKey] && nextItem[nextKey].loadCaseName && nextItem[nextKey].sign && nextItem[nextKey].factor) {
+                              temp.push({
+                                  loadCaseName: nextItem[nextKey].loadCaseName,
+                                  sign: nextItem[nextKey].sign,
+                                  factor: nextItem[nextKey].factor,
+                              });
+                          }
+                      });
+                      tempArray.push(temp);
+                      
+
+                      nextSubArray[nextItemIndex] = null;  // Mark the nextItem as processed
+                  }
+              });
+          }
+          additionalArray.push(tempArray);
+          loadCaseNames = [];  // Reset for the next item
+      });
+
+      // After processing the current subArray, push the additionalArray into the addObj
+      addObj.push(additionalArray.length > 0 ? additionalArray : tempArray);
+  });
+
+  return addObj;  // Return the final grouped array
 }
 
-
-  
   // Start processing the input object (assuming it's an array)
   processObject(inputObj);
 
@@ -620,7 +673,7 @@ function multipleFactor(input) {
   console.log(addObj);
   eitherArray = multipleFactor(eitherArray);
   addObj = multipleFactor(addObj);
-
+     
   return { eitherArray, addObj };
 }
 
@@ -735,6 +788,7 @@ function generateBasicCombinations(loadCombinations) {
         }
         
     }
+    const sign = loadCase.sign || '+';
     console.log(factors);
         // Call createCombinations with the current factor
         for (let factor = 1; factor <= 5; factor++) {
@@ -742,16 +796,15 @@ function generateBasicCombinations(loadCombinations) {
           
           // Check if the factor value is defined
           if (factorObject && factorObject.value !== undefined) {
-            const new_11 = createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor);
+            const new_11 = createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor,sign);
             console.log(new_11);
   
             // Combine and permute the results
             const result11 = combineAddEither([new_11]);
             console.log(result11);
-            const finalCombinations = permutation(result11);
-  
+            const finalCombinations_sign = permutation_sign(result11);
             // Add the permutations to the factorCombinations array
-            factorCombinations.push(finalCombinations);
+            factorCombinations.push(finalCombinations_sign);
           }
         }
     }
@@ -762,12 +815,12 @@ function generateBasicCombinations(loadCombinations) {
   
   return allFinalCombinations;
 }
-function permutation(result11) {
+function permutation_sign(result11) {
   const { addObj, eitherArray } = result11; // Destructure addObj from result11
-  const add = []; // Array to collect all objects from addObj
-  let dummyArray = []; // Temporary array to hold objects with ± sign for permutation generation
+  let add = []; // Array to collect all objects from addObj
   let either = [];
-  let finalCombinations = []; 
+  let finalCombinations = [];
+
   // Helper function to generate permutations of + and - signs
   function generatePermutations(objects) {
     const permutations = [];
@@ -784,83 +837,80 @@ function permutation(result11) {
       }
       permutations.push(newCombination);
     }
-
     return permutations;
   }
 
   // Step 1: Process each array inside addObj
-  for (const addArr of addObj) {
-    const positiveArray = []; // Array to collect objects with + sign
-    const negativeArray = []; // Array to collect objects with - sign
+  for (let addArrIndex = 0; addArrIndex < addObj.length; addArrIndex++) {
+    let addArr = addObj[addArrIndex]; // Get each array in addObj
+    let temp = []; // Temp array to store all combinations
+    
+    // Step 2: Loop through each object in addArr
+    for (let innerArrIndex = 0; innerArrIndex < addArr.length; innerArrIndex++) {
+      
+      let innerArr = addArr[innerArrIndex]; // Get each subarray (innerArr) in addArr
+      let positiveArray = []; // Array to collect objects with + sign
+      let negativeArray = []; // Array to collect objects with - sign
+      let dummyArray = []; // Temporary array for items with ± sign
+      let i = 0;
 
-    for (const obj of addArr) {
-      if (obj.sign === "+,-") {
-        // Handle +,- sign: create + and - versions and push to arrays
-        const positiveObj = { ...obj, sign: "+" };
-        const negativeObj = { ...obj, sign: "-" };
+      for (let obj of innerArr) {
+        temp = [];
+        // Loop through each item within obj to check and modify signs
+        for (const item of obj) {
+          if (item.sign === "+,-" || item.sign === "-,+") {
+            // Handle +,- or -,+ sign: create + and - versions and push to arrays
+            const positiveObj = { ...item, sign: "+" };
+            const negativeObj = { ...item, sign: "-" };
+            positiveArray.push(positiveObj);
+            negativeArray.push(negativeObj);
+          } else if (item.sign === "±") {
+            // Create two versions of the item: one with + sign, one with - sign
+            const positiveObj = { ...item, sign: "+" };
+            const negativeObj = { ...item, sign: "-" };
+            // Push both to dummyArray for later permutations
+            dummyArray.push(positiveObj);
+            dummyArray.push(negativeObj);
+          } else {
+            // For any other sign (+ or -), push the item to the temp array directly
+            temp.push({ ...item });
+          }
+        }
 
-        positiveArray.push(positiveObj);
-        negativeArray.push(negativeObj);
-      } else if (obj.sign === "±") {
-        // Push the object to dummyArray for later permutations
-        dummyArray.push(obj);
-      } else {
-        // For any other sign (+ or -), push the object to both positive and negative arrays
-        add.push({ ...obj });
+        for (const dummyItem of dummyArray) {
+          const combinedWithPositive = [...positiveArray, dummyItem]; // Combine with positiveArray
+          temp.push(combinedWithPositive); // Add to temp array
+
+          const combinedWithNegative = [...negativeArray, dummyItem]; // Combine with negativeArray
+          temp.push(combinedWithNegative); // Add to temp array
+        }
+
+        // Step 4: Handle permutation for objects with ± sign in temp array
+        if (positiveArray.length > 0 || negativeArray.length > 0) {
+          const combinedPositiveArray = [...temp, ...positiveArray]; // Combine positive objects with temp array
+          const combinedNegativeArray = [...temp, ...negativeArray]; // Combine negative objects with temp array
+
+          // Push the two new arrays into temp array
+          temp.push(combinedPositiveArray);
+          temp.push(combinedNegativeArray);
+        }
+
+        // Replace innerArr with temp
+        addArr[i] = temp;  
+        i = i + 1;
       }
+       
+      // Update addObj with modified addArr
+      
     }
-    // Step 2: Handle permutation for objects with ± sign
-    if (positiveArray.length > 0 || negativeArray.length > 0) {
-      const combinedPositiveArray = [...add, ...positiveArray]; // Combine positive objects with add array
-      const combinedNegativeArray = [...add, ...negativeArray]; // Combine negative objects with add array
-
-      // Push the two new arrays into add array
-      add.push(combinedPositiveArray);
-      add.push(combinedNegativeArray);
-    }
+    addObj[addArrIndex] = addArr;
   }
 
-  function combineArrays(arrays, index, currentCombination, result) {
-    if (index === arrays.length) {
-      // We've reached the last array, push the current combination into the result
-      result.push([...currentCombination]);
-      return;
-    }
-
-    // Loop through each object in the current array and recursively combine
-    for (const obj of arrays[index]) {
-      currentCombination.push(obj); // Add current object to the combination
-      combineArrays(arrays, index + 1, currentCombination, result); // Recurse for the next array
-      currentCombination.pop(); // Backtrack to try the next object
-    }
-  }
-
-  if (eitherArray.length > 0) {
-    combineArrays(eitherArray, 0, [], either); // Initialize the recursive combination process
-  }
-
- // Step 4: Combine add and either arrays to create finalCombinations
- if (add.length > 0) {
-  if (either.length > 0) {
-    // Both add and either arrays are not empty
-    for (const addArr of add) {
-      for (const eitherArr of either) {
-        // Combine one array from add and one from either
-        const combinedArray = [...addArr, ...eitherArr];
-        finalCombinations.push(combinedArray); // Push the combined array into finalCombinations
-      }
-    }
-  } else {
-    // Either array is empty, just push arrays from add
-    finalCombinations.push(...add);
-  }
-} else if (either.length > 0) {
-  // Add array is empty, just push arrays from either
-  finalCombinations.push(...either);
+  console.log(addObj);
+  return addObj;
 }
-// Return the final combinations array
-return finalCombinations;
-}
+
+
 
 function Generate_Load_Combination() {
   const basicCombinations = generateBasicCombinations(loadCombinations);
