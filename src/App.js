@@ -591,9 +591,7 @@ function multipleFactor(input) {
               if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
                   // If loadCaseNames match, push both into additionalArray
                   let matchArray = [];
-                  // matchArray.push(tempArray)
-                  // matchArray.push(temp);
-                  temp = []; // Clear temp for the next item
+                  temp = []; 
 
                   // Push matching nextItem into temp, then push temp into matchArray
                   Object.keys(nextItem).forEach((nextKey) => {
@@ -646,24 +644,18 @@ function multipleFactor(input) {
                           }
                       });
                       tempArray.push(temp);
-                      
-
-                      nextSubArray[nextItemIndex] = null;  // Mark the nextItem as processed
+                      nextSubArray[nextItemIndex] = null;
                   }
               });
           }
           additionalArray.push(tempArray);
-          loadCaseNames = [];  // Reset for the next item
+          loadCaseNames = [];
       });
-
-      // After processing the current subArray, push the additionalArray into the addObj
       addObj.push(additionalArray.length > 0 ? additionalArray : tempArray);
   });
 
-  return addObj;  // Return the final grouped array
+  return addObj;
 }
-
-  // Start processing the input object (assuming it's an array)
   processObject(inputObj);
 
   // Remove duplicates from eitherArray and addObj
@@ -680,71 +672,6 @@ function multipleFactor(input) {
 function findStrengthCombinations(combinations) {
   return combinations.filter(combo => combo.active === "Strength");
 }
-// function generateBasicCombinations(loadCombinations) {
-//   const strengthCombinations = findStrengthCombinations(loadCombinations);
-
-//   if (strengthCombinations.length === 0) {
-//     console.error("No combinations with active set to 'Strength' found.");
-//     return [];
-//   }
-//   const allFinalCombinations = [];
-//   for (const strengthCombination of strengthCombinations) {
-//     const type = strengthCombination.type;
-//     let factorCombinations;
-//     for (let factor = 1; factor <= 5; factor++) { // Loop through factors 1 to 5 
-//     // Iterate over each loadCase within the strengthCombination
-//     factorCombinations = [];
-//     for (const loadCase of strengthCombination.loadCases) {
-//         const factorKey = `factor${factor}`;
-//         const factorArray = [];
-//         // Extract the specific factor value
-//         const factorValue = loadCase[factorKey] !== undefined ? loadCase[factorKey] : 1;     
-//         // Call createCombinations with the extracted factor value
-//         createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, factorArray, factorValue,factor);
-//         const result11 = combineAddEither(factorArray, factor);
-//         const finalCombinations = permutation(result11);
-//         factorCombinations.push(finalCombinations);
-//         console.log(factorCombinations);
-//         allFinalCombinations.push(factorCombinations);
-//       }
-//     }
-//     // allFinalCombinations.push(factorCombinations);
-//     console.log(allFinalCombinations);
-//     // if (type === 'Add') {
-//     //   const combinationArray = [];
-
-//     //   // Helper function to check if the array is flat (does not contain nested arrays)
-//     //   const isFlatArray = (arr) => arr.every(item => !Array.isArray(item));
-
-//     //   // Helper function to flatten an array or wrap an object in an array
-//     //   const ensureArray = (item) => Array.isArray(item) ? item : [item];
-
-//     //   // Recursive function to create combinations
-//     //   const createCombinations = (arrays, index = 0, currentCombination = []) => {
-//     //     if (index === arrays.length) {
-//     //       combinationArray.push([...currentCombination]); // Push the final combination
-//     //       return;
-//     //     }
-//     //     const currentArray = ensureArray(arrays[index]);
-//     //     if (isFlatArray(currentArray)) {
-//     //       // If the current array is flat, pass the entire array as one element in the combination
-//     //       createCombinations(arrays, index + 1, [...currentCombination, ...currentArray]);
-//     //     } else {
-//     //       // If the current array contains nested arrays, continue combining individual elements
-//     //       for (const item of currentArray) {
-//     //         createCombinations(arrays, index + 1, [...currentCombination, item]);
-//     //       }
-//     //     }
-//     //   };
-
-//     //   // Start the combination process with allFinalCombinations
-//     //   createCombinations(allFinalCombinations);
-
-//     //   allFinalCombinations.push(combinationArray);  // Store the final combinations
-//     // }
-//   }
-//   return allFinalCombinations;
-// }
 function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
 
@@ -765,17 +692,12 @@ function generateBasicCombinations(loadCombinations) {
     for (const loadCase of strengthCombination.loadCases) {
       const factors = [];
     for (let factor = 1; factor <= 5; factor++) {
-      // Loop through factors from 1 to 5 
-        
-       
-        // Collect the factor value for the current factor
         const factorKey = `factor${factor}`;
         if (factorKey in loadCase) {
           // Extract the specific factor value
           const factorValue = loadCase[factorKey];
-          factors.push({ factor, value: factorValue });  // Push factor number and its value as an object
+          factors.push({ factor, value: factorValue }); 
         } else {
-          // If the factor is not present, add it with a default value of 1
           factors.push({ factor, value: 1 });
         }
         // Check if all factors are undefined, and if so, set factor1 to 1
@@ -809,114 +731,292 @@ function generateBasicCombinations(loadCombinations) {
         }
     }
     // Push the combinations for this strengthCombination to allFinalCombinations
-    allFinalCombinations.push(factorCombinations);
-    console.log(factorCombinations);
+    const joinedCombinations = join(factorCombinations);
+    allFinalCombinations.push(joinedCombinations);
   }
   
   return allFinalCombinations;
 }
-function permutation_sign(result11) {
-  const { addObj, eitherArray } = result11; // Destructure addObj from result11
-  let add = []; // Array to collect all objects from addObj
-  let either = [];
-  let finalCombinations = [];
+function join(factorCombinations) {
+  const joinArray = []; // Array to hold the final combined results
 
-  // Helper function to generate permutations of + and - signs
-  function generatePermutations(objects) {
-    const permutations = [];
-    const numPermutations = 2 ** objects.length; // Total number of permutations
+  for (const combination of factorCombinations) {
+    const { addObj, eitherArray } = combination; // Destructure addObj and eitherArray
 
-    // Loop through each possible combination of signs
-    for (let i = 0; i < numPermutations; i++) {
-      const newCombination = [];
-      for (let j = 0; j < objects.length; j++) {
-        // Use bit manipulation to decide whether to assign + or -
-        const sign = (i & (1 << j)) ? "+" : "-";
-        const newObj = { ...objects[j], sign };
-        newCombination.push(newObj);
+    // Temporary array to store combinations from eitherArray
+    const eitherJoin = [];
+
+    // Helper function to create combinations
+    function combineArrays(arrays) {
+      let result = [[]]; // Start with an array containing an empty array
+
+      if (arrays.length === 1) {
+        // Handle case with a single array
+        for (const item of arrays[0]) {
+          result.push([item]); // Push each item as an individual array into result
+        }
+      } else {
+        // If there are multiple arrays
+        const temp = []; // Temporary array for the current combination
+
+        // Process the first array separately
+        const firstArray = arrays[0];
+        for (const item of firstArray) {
+          temp.push([item]); // Push each item into temp as an individual array
+        
+
+        // Process subsequent arrays
+        for (let i = 1; i < arrays.length; i++) {
+          const currentArray = arrays[i];
+
+          // For each item in temp, combine with each item in the currentArray
+          const newTemp = []; // New temporary array to hold the combinations
+          for (const resItem of temp) {
+            for (const currentItem of currentArray) {
+              // Combine resItem with currentItem and push to newTemp
+              newTemp.push([...resItem, currentItem]);
+            }
+          }
+          temp.length = 0; // Clear temp to prepare for the next iteration
+          temp.push(...newTemp); // Update temp with the new combinations
+        }
       }
-      permutations.push(newCombination);
+        // At the end, assign the temp combinations to the result
+        result = temp;
+      }
+     console.log(result);
+      return result; // Return the final array of combined objects
     }
-    return permutations;
+
+    // If eitherArray exists, combine all possible combinations
+    if (eitherArray && eitherArray.length > 0) {
+      const combined = combineArrays(eitherArray);
+      eitherJoin.push(...combined); // Add all combinations to eitherJoin
+    }
+
+    // Merge eitherJoin with addObj
+    for (const eitherCombination of eitherJoin) {
+      for (const addCombination of addObj) {
+        const finalCombination = [...addCombination, ...eitherCombination];
+        joinArray.push(finalCombination);
+      }
+    }
   }
 
-  // Step 1: Process each array inside addObj
-  for (let addArrIndex = 0; addArrIndex < addObj.length; addArrIndex++) {
-    let addArr = addObj[addArrIndex]; // Get each array in addObj
-    let temp = []; // Temp array to store all combinations
-    
-    // Step 2: Loop through each object in addArr
-    for (let innerArrIndex = 0; innerArrIndex < addArr.length; innerArrIndex++) {
-      
-      let innerArr = addArr[innerArrIndex]; // Get each subarray (innerArr) in addArr
-      let positiveArray = []; // Array to collect objects with + sign
-      let negativeArray = []; // Array to collect objects with - sign
-      let dummyArray = []; // Temporary array for items with ± sign
-      let i = 0;
+  console.log(joinArray);
+  return joinArray; // Return the array of all combined results
+}
 
-      for (let obj of innerArr) {
-        temp = [];
-        // Loop through each item within obj to check and modify signs
+function permutation_sign(result11) {
+  const { addObj, eitherArray } = result11;
+  let finalCombinations = [];
+  
+  function generateCombinations(arrays) {
+    const results = [];
+    function recurse(currentCombo, depth) {
+      if (depth === arrays.length) {
+        results.push([...currentCombo]);
+        return;
+      }
+      for (let i = 0; i < arrays[depth].length; i++) {
+        currentCombo.push(arrays[depth][i]);
+        recurse(currentCombo, depth + 1);
+        currentCombo.pop();
+      }
+    }
+    recurse([], 0);
+    return results;
+  }
+  for (let addArrIndex = 0; addArrIndex < addObj.length; addArrIndex++) {
+    let addArr = addObj[addArrIndex]; 
+    for (let innerArrIndex = 0; innerArrIndex < addArr.length; innerArrIndex++) {
+      let innerArr = addArr[innerArrIndex];      
+      for (let objIndex = 0; objIndex < innerArr.length; objIndex++) {
+        let obj = innerArr[objIndex];
+        let positiveArray = [];
+        let negativeArray = [];
+        let dummyArray = [];
+        let dummy = [];
+        let new_temp = [];
+        let temp = [];
+
         for (const item of obj) {
+          dummy = [];
           if (item.sign === "+,-" || item.sign === "-,+") {
-            // Handle +,- or -,+ sign: create + and - versions and push to arrays
             const positiveObj = { ...item, sign: "+" };
             const negativeObj = { ...item, sign: "-" };
             positiveArray.push(positiveObj);
             negativeArray.push(negativeObj);
           } else if (item.sign === "±") {
-            // Create two versions of the item: one with + sign, one with - sign
             const positiveObj = { ...item, sign: "+" };
             const negativeObj = { ...item, sign: "-" };
-            // Push both to dummyArray for later permutations
-            dummyArray.push(positiveObj);
-            dummyArray.push(negativeObj);
+            dummy.push(positiveObj);
+            dummy.push(negativeObj);
+            dummyArray.push(dummy);
           } else {
-            // For any other sign (+ or -), push the item to the temp array directly
-            temp.push({ ...item });
+            new_temp.push({ ...item });
           }
         }
 
-        for (const dummyItem of dummyArray) {
-          const combinedWithPositive = [...positiveArray, dummyItem]; // Combine with positiveArray
-          temp.push(combinedWithPositive); // Add to temp array
+        if (dummyArray.length > 0) {
+          const combinations = generateCombinations(dummyArray);
+          
+          if (positiveArray.length > 0 && negativeArray.length > 0) {
+            for (const combination of combinations) {
+              const combinedWithPositive = [...positiveArray, ...combination];
+              const combinedWithNegative = [...negativeArray, ...combination];
 
-          const combinedWithNegative = [...negativeArray, dummyItem]; // Combine with negativeArray
-          temp.push(combinedWithNegative); // Add to temp array
+              if (new_temp.length > 0) {
+                for (const newItem of new_temp) {
+                  const newItemArray = Array.isArray(newItem) ? newItem : [newItem];
+                  temp.push([...combinedWithPositive, ...newItemArray]);
+                  temp.push([...combinedWithNegative, ...newItemArray]);
+                }
+              } else {
+                temp.push(combinedWithPositive);
+                temp.push(combinedWithNegative);
+              }
+            }
+          } else {
+            for (const combination of combinations) {
+              if (new_temp.length > 0) {
+                for (const newItem of new_temp) {
+                  temp.push([...combination, ...newItem]);
+                }
+              } else {
+                temp.push(combination);
+              }
+            }
+          }
+        } else {
+          if (new_temp.length > 0) {
+            for (const newItem of new_temp) {
+              if (positiveArray.length > 0 && negativeArray.length > 0) {
+                temp.push([...positiveArray, ...newItem]);
+                temp.push([...negativeArray, ...newItem]);
+              } else {
+                temp.push(newItem);
+              }
+            }
+          } else {
+            if (positiveArray.length > 0) {
+              temp.push([...positiveArray]);
+            }
+            if (negativeArray.length > 0) {
+              temp.push([...negativeArray]);
+            }
+          }
         }
-
-        // Step 4: Handle permutation for objects with ± sign in temp array
-        if (positiveArray.length > 0 || negativeArray.length > 0) {
-          const combinedPositiveArray = [...temp, ...positiveArray]; // Combine positive objects with temp array
-          const combinedNegativeArray = [...temp, ...negativeArray]; // Combine negative objects with temp array
-
-          // Push the two new arrays into temp array
-          temp.push(combinedPositiveArray);
-          temp.push(combinedNegativeArray);
+        if (temp.length === 0) {
+          innerArr.splice(objIndex, 1); // Remove the empty obj from innerArr
+          objIndex--; // Adjust the index after removal to avoid skipping elements
+        } else {
+          obj.length = 0;
+          obj.push(...temp); // Push modified combinations to obj
         }
-
-        // Replace innerArr with temp
-        addArr[i] = temp;  
-        i = i + 1;
       }
-       
-      // Update addObj with modified addArr
-      
     }
-    addObj[addArrIndex] = addArr;
   }
+  if (eitherArray !== undefined) {
+  for (let eitherArrIndex = 0; eitherArrIndex < eitherArray.length; eitherArrIndex++) {
+    let eitherArr = eitherArray[eitherArrIndex]; 
+    for (let innerArrIndex = 0; innerArrIndex < eitherArr.length; innerArrIndex++) {
+      let innerArr = eitherArr[innerArrIndex]; 
+      
+      for (let objIndex = 0; objIndex < innerArr.length; objIndex++) {
+        let obj = innerArr[objIndex];
+        let positiveArray = [];
+        let negativeArray = [];
+        let dummyArray = [];
+        let dummy = [];
+        let new_temp = [];
+        let temp = [];
 
-  console.log(addObj);
-  return addObj;
+        for (const item of obj) {
+          dummy = [];
+          if (item.sign === "+,-" || item.sign === "-,+") {
+            const positiveObj = { ...item, sign: "+" };
+            const negativeObj = { ...item, sign: "-" };
+            positiveArray.push(positiveObj);
+            negativeArray.push(negativeObj);
+          } else if (item.sign === "±") {
+            const positiveObj = { ...item, sign: "+" };
+            const negativeObj = { ...item, sign: "-" };
+            dummy.push(positiveObj);
+            dummy.push(negativeObj);
+            dummyArray.push(dummy);
+          } else {
+            new_temp.push({ ...item });
+          }
+        }
+
+        if (dummyArray.length > 0) {
+          const combinations = generateCombinations(dummyArray);  
+          if (positiveArray.length > 0 && negativeArray.length > 0) {
+            for (const combination of combinations) {
+              const combinedWithPositive = [...positiveArray, ...combination];
+              const combinedWithNegative = [...negativeArray, ...combination];
+
+              if (new_temp.length > 0) {
+                for (const newItem of new_temp) {
+                  const newItemArray = Array.isArray(newItem) ? newItem : [newItem];
+                  temp.push([...combinedWithPositive, ...newItemArray]);
+                  temp.push([...combinedWithNegative, ...newItemArray]);
+                }
+              } else {
+                temp.push(combinedWithPositive);
+                temp.push(combinedWithNegative);
+              }
+            }
+          } else {
+            for (const combination of combinations) {
+              if (new_temp.length > 0) {
+                for (const newItem of new_temp) {
+                  temp.push([...combination, ...newItem]);
+                }
+              } else {
+                temp.push(combination);
+              }
+            }
+          }
+        } else {
+          if (new_temp.length > 0) {
+            for (const newItem of new_temp) {
+              if (positiveArray.length > 0 && negativeArray.length > 0) {
+                temp.push([...positiveArray, ...newItem]);
+                temp.push([...negativeArray, ...newItem]);
+              } else {
+                temp.push(newItem);
+              }
+            }
+          } else {
+            if (positiveArray.length > 0) {
+              temp.push([...positiveArray]);
+            }
+            if (negativeArray.length > 0) {
+              temp.push([...negativeArray]);
+            }
+          }
+        }
+
+        // If temp is empty, delete the current obj from innerArr
+        if (temp.length === 0) {
+          innerArr.splice(objIndex, 1); // Remove the empty obj from innerArr
+          objIndex--; // Adjust the index after removal to avoid skipping elements
+        } else {
+          obj.length = 0;
+          obj.push(...temp); // Push modified combinations to obj
+        }
+      }
+    }
+  }
+  }
+  console.log({ addObj, eitherArray });
+  return { addObj, eitherArray };
 }
-
-
 
 function Generate_Load_Combination() {
   const basicCombinations = generateBasicCombinations(loadCombinations);
-  // console.log(basicCombinations);
-  // const permutations = generatePermutationsOfCombinations(basicCombinations);
-  // console.log("All Possible Permutations of Combinations:", permutations);
 }
 const toggleExcelReader = () => {
   fileInputRef.current.click();
