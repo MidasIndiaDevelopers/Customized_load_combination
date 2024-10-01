@@ -336,7 +336,6 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
       console.error(`Load case ${loadCases.loadCaseName} not found in combinations.`);
     }
   }
-
   console.log(result);
   return result;
 }
@@ -566,11 +565,7 @@ function multipleFactor(input) {
                   }
               });
           }
-
-          // Store all loadCaseNames of the current item in tempArray
           tempArray.push(temp);
-
-          // Now compare the current `loadCaseNames` with the next item in the subArray (if available)
           for (let nextIndex = itemIndex + 1; nextIndex < subArray.length; nextIndex++) {
               let nextItem = subArray[nextIndex];
               if (nextItem === null) continue;  // Skip already processed items
@@ -586,14 +581,10 @@ function multipleFactor(input) {
                       }
                   });
               }
-
-              // Compare the current loadCaseName with the next item's loadCaseName
               if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
                   // If loadCaseNames match, push both into additionalArray
                   let matchArray = [];
                   temp = []; 
-
-                  // Push matching nextItem into temp, then push temp into matchArray
                   Object.keys(nextItem).forEach((nextKey) => {
                       if (nextItem[nextKey] && nextItem[nextKey].loadCaseName && nextItem[nextKey].sign && nextItem[nextKey].factor) {
                           temp.push({
@@ -604,13 +595,9 @@ function multipleFactor(input) {
                       }
                   });
                   tempArray.push(temp);
-                    // Push the matched items into the additional array
-
-                  subArray[nextIndex] = null;  // Mark the nextItem as processed
+                  subArray[nextIndex] = null;
               }
           }
-          // additionalArray.push(tempArray);
-          // Now process the next sub-array if available, and compare with the current item
           for (let nextSubArrayIndex = subArrayIndex + 1; nextSubArrayIndex < input.length; nextSubArrayIndex++) {
               let nextSubArray = input[nextSubArrayIndex];
 
@@ -672,6 +659,7 @@ function multipleFactor(input) {
 function findStrengthCombinations(combinations) {
   return combinations.filter(combo => combo.active === "Strength");
 }
+
 function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
 
@@ -679,9 +667,7 @@ function generateBasicCombinations(loadCombinations) {
     console.error("No combinations with active set to 'Strength' found.");
     return [];
   }
-
   const allFinalCombinations = [];
-
   // Iterate over each strengthCombination
   for (const strengthCombination of strengthCombinations) {
     const type = strengthCombination.type;
@@ -720,7 +706,6 @@ function generateBasicCombinations(loadCombinations) {
           if (factorObject && factorObject.value !== undefined) {
             const new_11 = createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor,sign);
             console.log(new_11);
-  
             // Combine and permute the results
             const result11 = combineAddEither([new_11]);
             console.log(result11);
@@ -731,80 +716,146 @@ function generateBasicCombinations(loadCombinations) {
         }
     }
     // Push the combinations for this strengthCombination to allFinalCombinations
-    const joinedCombinations = join(factorCombinations);
+    const joinedCombinations = join(factorCombinations     );
+    console.log(joinedCombinations);
     allFinalCombinations.push(joinedCombinations);
-  }
   
+    if (type === 'Add') {
+      const joinedCombination = [];
+    
+      // Recursive helper function to generate combinations from joinArray
+      function combineArrays(arrays, index = 0, currentCombination = []) {
+        if (index === arrays.length) {
+          // If we've combined arrays from all groups, push the result
+          joinedCombination.push([...currentCombination]);
+          return;
+        }
+    
+        // For each array in the current group of arrays (arrays[index])
+        for (const subArray of arrays[index]) {
+          // Combine the current subArray with the ongoing combination
+          currentCombination.push(...subArray);
+    
+          // Recurse into the next group of arrays
+          combineArrays(arrays, index + 1, currentCombination);
+    
+          // Backtrack to explore other combinations
+          currentCombination.length -= subArray.length;
+        }
+      }
+    
+      // Start the combination process for the arrays in joinArray
+      combineArrays(joinedCombinations);
+    
+      allFinalCombinations.push(joinedCombination);
+    }
+}
+  console.log(allFinalCombinations);
   return allFinalCombinations;
 }
+
 function join(factorCombinations) {
-  const joinArray = []; // Array to hold the final combined results
-
+  const joinArray = [];
+  const allFinalCombinations = [];
   for (const combination of factorCombinations) {
-    const { addObj, eitherArray } = combination; // Destructure addObj and eitherArray
+    const join = [];
+    const { addObj, eitherArray } = combination; 
 
-    // Temporary array to store combinations from eitherArray
     const eitherJoin = [];
-
-    // Helper function to create combinations
     function combineArrays(arrays) {
-      let result = [[]]; // Start with an array containing an empty array
-
-      if (arrays.length === 1) {
-        // Handle case with a single array
-        for (const item of arrays[0]) {
-          result.push([item]); // Push each item as an individual array into result
-        }
-      } else {
-        // If there are multiple arrays
-        const temp = []; // Temporary array for the current combination
-
-        // Process the first array separately
-        const firstArray = arrays[0];
-        for (const item of firstArray) {
-          temp.push([item]); // Push each item into temp as an individual array
-        
-
-        // Process subsequent arrays
-        for (let i = 1; i < arrays.length; i++) {
-          const currentArray = arrays[i];
-
-          // For each item in temp, combine with each item in the currentArray
-          const newTemp = []; // New temporary array to hold the combinations
-          for (const resItem of temp) {
-            for (const currentItem of currentArray) {
-              // Combine resItem with currentItem and push to newTemp
-              newTemp.push([...resItem, currentItem]);
-            }
+      const result = []; 
+      const eitherjoin = [];
+      for (const currentArray of arrays) {
+        for (const item of currentArray) {
+              const flattenedArray = [];
+              flattenedArray.push(...item); // Spread operator to flatten the item
+              const joinedArray = flattenedArray.flat();
+              console.log(joinedArray);
+              eitherjoin.push(joinedArray);
           }
-          temp.length = 0; // Clear temp to prepare for the next iteration
-          temp.push(...newTemp); // Update temp with the new combinations
         }
+        function generateCombinations(index, temp) {
+          if (index === eitherjoin.length) {
+              result.push([...temp]);
+              return;
+          }
+          for (const obj of eitherjoin[index]) {
+              temp.push(obj); 
+              generateCombinations(index + 1, temp); 
+              temp.pop(); 
+          }
       }
-        // At the end, assign the temp combinations to the result
-        result = temp;
-      }
-     console.log(result);
-      return result; // Return the final array of combined objects
+  
+      generateCombinations(0, []); 
+      console.log(eitherjoin);
+      console.log(result); // Log the result for debugging
+      return result; // Return the final combinations
     }
-
-    // If eitherArray exists, combine all possible combinations
     if (eitherArray && eitherArray.length > 0) {
       const combined = combineArrays(eitherArray);
       eitherJoin.push(...combined); // Add all combinations to eitherJoin
+      console.log(eitherJoin);
     }
 
-    // Merge eitherJoin with addObj
-    for (const eitherCombination of eitherJoin) {
+      // Loop through each array in addObj (or addCombination)
+      for (const eitherCombination of eitherJoin) {
+        // Loop through each array in addObj (or addCombination)
+        for (const addCombination of addObj) {
+            // Check if addCombination is not empty
+            if (addCombination.length > 0) {
+                // Iterate over each inner array in addCombination
+                for (const innerArray of addCombination) {
+                    // Check if innerArray is not empty
+                    if (innerArray.length > 0) {
+                        // Iterate over each subArray in innerArray
+                        for (const subArray of innerArray) {
+                            // Check if subArray is not empty
+                            if (subArray.length > 0) {
+                                // Iterate over each item in subArray
+                                for (const item of subArray) {
+                                    // Combine each item with eitherCombination
+                                    const finalCombination = [...item, ...eitherCombination];
+                                    join.push(finalCombination); // Push the final combination into joinArray
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (eitherJoin.length == 0) {
       for (const addCombination of addObj) {
-        const finalCombination = [...addCombination, ...eitherCombination];
-        joinArray.push(finalCombination);
+          // Check if addCombination is not empty
+          if (addCombination.length > 0) {
+              // Iterate over each inner array in addCombination
+              for (const innerArray of addCombination) {
+                  // Check if innerArray is not empty
+                  if (innerArray.length > 0) {
+                      // Iterate over each subArray in innerArray
+                      for (const subArray of innerArray) {
+                          // Check if subArray is not empty and if it contains multiple arrays
+                          if (Array.isArray(subArray[0])) {
+                              // Iterate over each item in subArray if it contains multiple arrays
+                              for (const item of subArray) {
+                                  // Push the item (which is an array itself) into join
+                                  join.push([...item]);
+                              }
+                          } else {
+                              // If subArray does not contain multiple arrays, push it directly
+                              join.push([...subArray]);
+                          }
+                      }
+                  }
+              }
+          }
       }
-    }
   }
-
+    joinArray.push(join);
+  }
   console.log(joinArray);
-  return joinArray; // Return the array of all combined results
+  
+  return allFinalCombinations; // Return the array of all combined results
 }
 
 function permutation_sign(result11) {
