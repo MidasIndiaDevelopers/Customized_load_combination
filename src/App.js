@@ -357,9 +357,9 @@ function multiplySigns(sign1, sign2) {
   if ((sign1 === '-,+' && sign2 === '-') || (sign2 === '-,+' && sign1 === '-')) return '+,-';
   if ((sign1 === '+' && sign2 === '-,+') || (sign2 === '+' && sign1 === '-,+')) return '+,-';
   if ((sign1 === '-' && sign2 === '-,+') || (sign2 === '-' && sign1 === '-,+')) return '+,-';
-  if ((sign1 === '+,-' && sign2 === '-,+') || (sign2 === '+,-' && sign1 === '-,+')) return '+,-,-,+';
-  if ((sign1 === '-,+' && sign2 === '+,-') || (sign2 === '-,+' && sign1 === '+,-')) return '+,-,-,+';
-  if ((sign1 === '-,+' && sign2 === '-,+')) return '-,+';
+  if ((sign1 === '+,-' && sign2 === '-,+') || (sign2 === '+,-' && sign1 === '-,+')) return '+,-';
+  if ((sign1 === '-,+' && sign2 === '+,-') || (sign2 === '-,+' && sign1 === '+,-')) return '+,-';
+  if ((sign1 === '-,+' && sign2 === '-,+')) return '+,-';
 
   // Handle combinations with ±
   if ((sign1 === '±' && sign2 === '+') || (sign2 === '±' && sign1 === '+')) return '±'; // ± * + = ±
@@ -716,18 +716,18 @@ function generateBasicCombinations(loadCombinations) {
         }
     }
     // Push the combinations for this strengthCombination to allFinalCombinations
-    const joinedCombinations = join(factorCombinations     );
+    const joinedCombinations = join(factorCombinations);
     console.log(joinedCombinations);
-    allFinalCombinations.push(joinedCombinations);
+    // allFinalCombinations.push(joinedCombinations);
   
     if (type === 'Add') {
-      const joinedCombination = [];
+      const joinedComb = [];
     
       // Recursive helper function to generate combinations from joinArray
       function combineArrays(arrays, index = 0, currentCombination = []) {
         if (index === arrays.length) {
           // If we've combined arrays from all groups, push the result
-          joinedCombination.push([...currentCombination]);
+          joinedComb.push([...currentCombination]);
           return;
         }
     
@@ -747,7 +747,12 @@ function generateBasicCombinations(loadCombinations) {
       // Start the combination process for the arrays in joinArray
       combineArrays(joinedCombinations);
     
-      allFinalCombinations.push(joinedCombination);
+      allFinalCombinations.push(joinedComb);
+    }
+    if (type === "either") {
+      // Concatenate all arrays in `joinedCombinations` into a single array
+      const concatenatedArray = joinedCombinations.flat(); 
+      console.log(concatenatedArray);  // This will be a single array with a size of 2032 if the original sizes were 2, 2, and 2028
     }
 }
   console.log(allFinalCombinations);
@@ -796,34 +801,36 @@ function join(factorCombinations) {
       eitherJoin.push(...combined); // Add all combinations to eitherJoin
       console.log(eitherJoin);
     }
-
       // Loop through each array in addObj (or addCombination)
-      for (const eitherCombination of eitherJoin) {
-        // Loop through each array in addObj (or addCombination)
-        for (const addCombination of addObj) {
-            // Check if addCombination is not empty
-            if (addCombination.length > 0) {
-                // Iterate over each inner array in addCombination
-                for (const innerArray of addCombination) {
-                    // Check if innerArray is not empty
-                    if (innerArray.length > 0) {
-                        // Iterate over each subArray in innerArray
-                        for (const subArray of innerArray) {
-                            // Check if subArray is not empty
-                            if (subArray.length > 0) {
-                                // Iterate over each item in subArray
-                                for (const item of subArray) {
-                                    // Combine each item with eitherCombination
-                                    const finalCombination = [...item, ...eitherCombination];
-                                    join.push(finalCombination); // Push the final combination into joinArray
-                                }
-                            }
-                        }
-                    }
+      if (eitherJoin.length > 0) {
+        for (const eitherCombination of eitherJoin) {
+          // Loop through each array in addObj (or addCombination)
+          for (let addCombination of addObj) {
+            // Remove empty arrays in addCombination
+            addCombination = addCombination.filter(innerArray => innerArray.length > 0);
+      
+            // Iterate over each inner array in addCombination
+            for (let innerArray of addCombination) {
+              // Remove empty arrays in innerArray
+              innerArray = innerArray.filter(subArray => subArray.length > 0);
+      
+              // Iterate over each subArray in innerArray
+              for (let subArray of innerArray) {
+                // Remove empty arrays in subArray
+                subArray = subArray.filter(item => item.length > 0);
+      
+                // Iterate over each item in subArray
+                for (const item of subArray) {
+                  // Combine each item with eitherCombination
+                  const finalCombination = [...item, ...eitherCombination];
+                  join.push(finalCombination); // Push the final combination into join array
                 }
+              }
             }
+          }
         }
-    }
+      }
+      
     if (eitherJoin.length == 0) {
       for (const addCombination of addObj) {
           // Check if addCombination is not empty
@@ -855,7 +862,7 @@ function join(factorCombinations) {
   }
   console.log(joinArray);
   
-  return allFinalCombinations; // Return the array of all combined results
+  return joinArray; // Return the array of all combined results
 }
 
 function permutation_sign(result11) {
@@ -1068,6 +1075,9 @@ function permutation_sign(result11) {
 
 function Generate_Load_Combination() {
   const basicCombinations = generateBasicCombinations(loadCombinations);
+  console.log(basicCombinations);
+  const uniqueCombinations = [...new Set(basicCombinations)];
+  console.log(uniqueCombinations);
 }
 const toggleExcelReader = () => {
   fileInputRef.current.click();
