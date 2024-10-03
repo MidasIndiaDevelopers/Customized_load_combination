@@ -427,27 +427,19 @@ function convertToObj(result, parentKey = '') {
   return finalObj;
 }
 function combineAddEither(inputObj) {
-  let eitherArray = []; // Array for "Either" type
-  let addObj = []; // Array for "Add" type
-
-  // Recursive helper function to process each object
+  let eitherArray = []; 
+  let addObj = []; 
   function processObject(obj, parentKey = null) {
     if (Array.isArray(obj)) {
-      // Loop through the array itself
       obj.forEach((value) => {
-        // Check if the current item is an object
         if (typeof value === 'object' && value !== null) {
-          // Process the key-value pairs inside the object
           processKeyValuePairs(value, parentKey);
         }
       });
     } else {
-      // If input is not an array, process it as a key-value pair object
       processKeyValuePairs(obj, parentKey);
     }
   }
-
-  // Function to process key-value pairs
   function processKeyValuePairs(obj, parentKey) {
     // Loop through each key-value pair in the object
     for (const [key, value] of Object.entries(obj)) {
@@ -455,12 +447,8 @@ function combineAddEither(inputObj) {
       if (key === 'Add' || key === 'Either') {
         parentKey = key;
       }
-
-      // Check if the value is an array or an object
       if (Array.isArray(value)) {
-        let temp = []; // Temporary array to hold processed objects
-
-        // Loop through each array in the value
+        let temp = [];
         value.forEach((subArrayOrItem) => {
           if (Array.isArray(subArrayOrItem)) {
             // If the current value is a nested array, loop through the inner array
@@ -468,12 +456,7 @@ function combineAddEither(inputObj) {
               if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
                 // Create a new object and loop through each key-value pair of the item
                 const newObj = {};
-
-                // Loop through each property of the object
                 for (const [itemKey, itemValue] of Object.entries(item)) {
-                 // Add each property to the new object
-
-                  // If item contains "Add" or "Either", process it again
                   if (itemKey === 'Add' || itemKey === 'Either') {
                     processKeyValuePairs(item, parentKey); // Recursive call
                   }
@@ -481,48 +464,38 @@ function combineAddEither(inputObj) {
                     newObj[itemKey] = itemValue; 
                   }
                 }
-
-                // Push the new object into the temp array
                 temp.push(newObj);
               }
             });
-
           } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
             // If subArrayOrItem is a direct object (not an array)
             const newObj = {};
-
             // Loop through each property of the subArrayOrItem object
             for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
               newObj[itemKey] = itemValue; // Add each property to the new object
-
               // If the object contains "Add" or "Either", process it again
               if (itemKey === 'Add' || itemKey === 'Either') {
                 processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
               }
             }
-
             // Push the new object into the temp array
             temp.push(newObj);
-          } else {
-            // If the value is not an object, call processObject recursively
-            processObject(subArrayOrItem, parentKey);
-          }
+           } 
+          // else {
+          //   // If the value is not an object, call processObject recursively
+          //   processObject(subArrayOrItem, parentKey);
+          // }
         });
-
-        // After processing the entire array, push the temp array into eitherArray or addObj
         if (parentKey === 'Either') {
           eitherArray.push(temp);
         } else if (parentKey === 'Add') {
           addObj.push(temp);
         }
       } else if (typeof value === 'object' && value !== null) {
-        // If the value is another object, recursively call processObject
-        processObject(value, key); // Pass the current key as the new parentKey
+        processObject(value, key);
       }
     }
   }
-
-  // Function to remove duplicates from arrays of objects
   function removeDuplicates(arr) {
     const uniqueSet = new Set(arr.map(item => JSON.stringify(item)));
     return Array.from(uniqueSet).map(item => JSON.parse(item));
@@ -571,8 +544,6 @@ function multipleFactor(input) {
               if (nextItem === null) continue;  // Skip already processed items
               
               let loadCaseName_temp = [];
-
-              // Check if nextItem is valid
               if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
                   Object.keys(nextItem).forEach((nextKey) => {
                       // Extract and store next item's loadCaseName
@@ -640,22 +611,23 @@ function multipleFactor(input) {
       });
       addObj.push(additionalArray.length > 0 ? additionalArray : tempArray);
   });
-
+  console.log(addObj);
   return addObj;
 }
   processObject(inputObj);
 
   // Remove duplicates from eitherArray and addObj
-  eitherArray = removeDuplicates(eitherArray);
-  addObj = removeDuplicates(addObj);
+  // eitherArray = removeDuplicates(eitherArray);
+  // addObj = removeDuplicates(addObj);
   console.log(eitherArray);
   console.log(addObj);
   eitherArray = multipleFactor(eitherArray);
   addObj = multipleFactor(addObj);
+
+  console.log({ addObj, eitherArray });
      
   return { eitherArray, addObj };
 }
-
 function findStrengthCombinations(combinations) {
   return combinations.filter(combo => combo.active === "Strength");
 }
@@ -693,8 +665,7 @@ function generateBasicCombinations(loadCombinations) {
           if (factor1) {
             factor1.value = 1;
           }
-        }
-        
+        }      
     }
     const sign = loadCase.sign || '+';
     console.log(factors);
@@ -743,8 +714,6 @@ function generateBasicCombinations(loadCombinations) {
           currentCombination.length -= subArray.length;
         }
       }
-    
-      // Start the combination process for the arrays in joinArray
       combineArrays(joinedCombinations);
     
       allFinalCombinations.push(joinedComb);
@@ -793,8 +762,8 @@ function join(factorCombinations) {
   
       generateCombinations(0, []); 
       console.log(eitherjoin);
-      console.log(result); // Log the result for debugging
-      return result; // Return the final combinations
+      console.log(result); 
+      return result;
     }
     if (eitherArray && eitherArray.length > 0) {
       const combined = combineArrays(eitherArray);
@@ -1056,8 +1025,6 @@ function permutation_sign(result11) {
             }
           }
         }
-
-        // If temp is empty, delete the current obj from innerArr
         if (temp.length === 0) {
           innerArr.splice(objIndex, 1); // Remove the empty obj from innerArr
           objIndex--; // Adjust the index after removal to avoid skipping elements
@@ -1072,7 +1039,6 @@ function permutation_sign(result11) {
   console.log({ addObj, eitherArray });
   return { addObj, eitherArray };
 }
-
 function Generate_Load_Combination() {
   const basicCombinations = generateBasicCombinations(loadCombinations);
   console.log(basicCombinations);
