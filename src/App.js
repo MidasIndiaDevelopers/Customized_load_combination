@@ -301,8 +301,6 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
           newLoadCases.loadCases.forEach(eitherLoadCase => {
             const currentFactorValue = eitherLoadCase[`factor${factor}`];
             if (currentFactorValue === undefined) return;
-
-            // Multiply signs as well as factors
             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
             createCombinations(eitherLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor, newSign);
           });
@@ -382,50 +380,50 @@ function multiplySigns(sign1, sign2) {
 }
 
 
-function removeDuplicateArrays(arrayOfArrays) {
-   // Stringify each array for comparison
-  const uniqueArrays = arrayOfArrays.map(arr => JSON.stringify(arr));
+// function removeDuplicateArrays(arrayOfArrays) {
+//    // Stringify each array for comparison
+//   const uniqueArrays = arrayOfArrays.map(arr => JSON.stringify(arr));
 
-  // Remove duplicates by converting to a Set, then back to an array
-  const uniqueArraySet = Array.from(new Set(uniqueArrays));
+//   // Remove duplicates by converting to a Set, then back to an array
+//   const uniqueArraySet = Array.from(new Set(uniqueArrays));
 
-  // Parse the strings back into arrays
-  return uniqueArraySet.map(str => JSON.parse(str));
-}
-function removeDuplicates(arr) {
-    const seen = new Set();
-    return arr.filter(item => {
-      const key = JSON.stringify(item); // Use JSON.stringify to create a unique key
-      if (seen.has(key)) {
-        return false; // Duplicate found
-      }
-      seen.add(key);
-      return true;
-    });
-  }
+//   // Parse the strings back into arrays
+//   return uniqueArraySet.map(str => JSON.parse(str));
+// }
+// function removeDuplicates(arr) {
+//     const seen = new Set();
+//     return arr.filter(item => {
+//       const key = JSON.stringify(item); // Use JSON.stringify to create a unique key
+//       if (seen.has(key)) {
+//         return false; // Duplicate found
+//       }
+//       seen.add(key);
+//       return true;
+//     });
+//   }
 
-function convertToObj(result, parentKey = '') {
-  const finalObj = {}; // This will hold the flattened result
+// function convertToObj(result, parentKey = '') {
+//   const finalObj = {}; // This will hold the flattened result
 
-  // Helper function to recursively process key-value pairs and flatten them
-  function processKeyValuePair(currentResult, targetObj, parentKey) {
-      for (const [key, value] of Object.entries(currentResult)) {
-          const newKey = parentKey ? `${parentKey}_${key}` : key; // Combine parentKey with current key for flattening
+//   // Helper function to recursively process key-value pairs and flatten them
+//   // function processKeyValuePair(currentResult, targetObj, parentKey) {
+//   //     for (const [key, value] of Object.entries(currentResult)) {
+//   //         const newKey = parentKey ? `${parentKey}_${key}` : key; // Combine parentKey with current key for flattening
           
-          if (Array.isArray(value) || typeof value === 'object') {
-              // If the value is an object or array, process it recursively
-              processKeyValuePair(value, targetObj, newKey);
-          } else {
-              // Store the value in the flattened structure
-              targetObj[newKey] = value;
-          }
-      }
-  }
-  // Start processing the result recursively
-  processKeyValuePair(result, finalObj, parentKey);
-  console.log(finalObj);
-  return finalObj;
-}
+//   //         if (Array.isArray(value) || typeof value === 'object') {
+//   //             // If the value is an object or array, process it recursively
+//   //             processKeyValuePair(value, targetObj, newKey);
+//   //         } else {
+//   //             // Store the value in the flattened structure
+//   //             targetObj[newKey] = value;
+//   //         }
+//   //     }
+//   // }
+//   // Start processing the result recursively
+//   processKeyValuePair(result, finalObj, parentKey);
+//   console.log(finalObj);
+//   return finalObj;
+// }
 function combineAddEither(inputObj) {
   let eitherArray = []; 
   let addObj = []; 
@@ -435,8 +433,8 @@ function combineAddEither(inputObj) {
         if (typeof value === 'object' && value !== null) {
           processKeyValuePairs(value, parentKey);
         }
-      });
-    } else {
+      });}
+    else {
       processKeyValuePairs(obj, parentKey);
     }
   }
@@ -454,17 +452,13 @@ function combineAddEither(inputObj) {
             // If the current value is a nested array, loop through the inner array
             subArrayOrItem.forEach((item) => {
               if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
-                // Create a new object and loop through each key-value pair of the item
-                const newObj = {};
-                for (const [itemKey, itemValue] of Object.entries(item)) {
-                  if (itemKey === 'Add' || itemKey === 'Either') {
-                    processKeyValuePairs(item, parentKey); // Recursive call
-                  }
-                  else {
-                    newObj[itemKey] = itemValue; 
-                  }
+                // Check if the item has 'Add' or 'Either' and make the recursive call if needed
+                if (item.Add || item.Either) {
+                  processKeyValuePairs(item, parentKey); // Recursive call for nested 'Add' or 'Either'
+                } else {
+                  // Directly push the item if it doesn't have 'Add' or 'Either'
+                  temp.push(item);
                 }
-                temp.push(newObj);
               }
             });
           } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
@@ -481,17 +475,17 @@ function combineAddEither(inputObj) {
             // Push the new object into the temp array
             temp.push(newObj);
            } 
-          // else {
-          //   // If the value is not an object, call processObject recursively
-          //   processObject(subArrayOrItem, parentKey);
-          // }
+          else {
+            // If the value is not an object, call processObject recursively
+            processObject(subArrayOrItem, parentKey);
+          }
         });
         if (parentKey === 'Either') {
           eitherArray.push(temp);
         } else if (parentKey === 'Add') {
           addObj.push(temp);
-        }
-      } else if (typeof value === 'object' && value !== null) {
+        } }
+       else if (typeof value === 'object' && value !== null) {
         processObject(value, key);
       }
     }
@@ -515,21 +509,15 @@ function multipleFactor(input) {
       let tempArray = [];  // Temporary array for the current subArray
       let loadCaseNames = [];  // Store the loadCaseName of the current object
       let additionalArray = [];  // Additional array to collect matches
-
-      // Process each item inside the subArray
       subArray.forEach((item, itemIndex) => {
-          if (item === null) return;  // Skip already processed items
+          if (item === null) return; 
           tempArray = [];
-          let temp = [];  // Temporary array for storing the current item's properties
-
-          // Check if item is an object and has the necessary properties
+          let temp = []; 
           if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
               Object.keys(item).forEach((key) => {
                   // Extract loadCaseName, sign, and factor properties
                   if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
-                      loadCaseNames.push(item[key].loadCaseName);  // Collect loadCaseName
-
-                      // Store the current item in temp
+                      loadCaseNames.push(item[key].loadCaseName);
                       temp.push({
                           loadCaseName: item[key].loadCaseName,
                           sign: item[key].sign,
@@ -615,10 +603,6 @@ function multipleFactor(input) {
   return addObj;
 }
   processObject(inputObj);
-
-  // Remove duplicates from eitherArray and addObj
-  // eitherArray = removeDuplicates(eitherArray);
-  // addObj = removeDuplicates(addObj);
   console.log(eitherArray);
   console.log(addObj);
   eitherArray = multipleFactor(eitherArray);
