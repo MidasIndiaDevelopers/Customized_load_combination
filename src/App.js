@@ -499,9 +499,9 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                 multipliedFactor = eitherLoadCase[factorKey] !== undefined ? eitherLoadCase[factorKey] * value : 0;
               // }
               if (!Array.isArray(factorArray[factor - 1])) {
-                factorArray[factor - 1] = new Array(5).fill(undefined);
+                factorArray[factorIndex - 1] = new Array(5).fill(undefined);
               }
-              factorArray[i - 1][factor - 1] = multipliedFactor;
+              factorArray[i - 1][factorIndex - 1] = multipliedFactor;
             }
             const loadCaseObj = {
               loadCaseName: eitherLoadCase.loadCaseName,
@@ -543,13 +543,11 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
             for (let i = 1; i <= 5; i++) {
               const factorKey = `factor${i}`;
               let multipliedFactor = addLoadCase[factorKey] * value;
-              // if (i === factor) {
                 multipliedFactor = addLoadCase[factorKey] !== undefined ? addLoadCase[factorKey] * value : 0;
-              // }
               if (!Array.isArray(factorArray[factor - 1])) {
-                factorArray[factor - 1] = new Array(5).fill(undefined);
+                factorArray[factorIndex - 1] = new Array(5).fill(undefined);
               }
-              factorArray[i - 1][factor - 1] = multipliedFactor;
+              factorArray[i - 1][factorIndex - 1] = multipliedFactor;
             }
             const loadCaseObj = {
               loadCaseName: addLoadCase.loadCaseName,
@@ -572,7 +570,6 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
           }
         });
         addResult.push(tempArray_add);
-        
       } 
       result["Add"].push(addResult);
     }
@@ -860,7 +857,7 @@ function generateBasicCombinations(loadCombinations) {
           const finalCombinations_sign = permutation_sign(result11);  
           console.log(finalCombinations_sign);
           const fact = join_factor(finalCombinations_sign);
-            // Add the permutations to the factorCombinations array
+          console.log(fact);
           factorCombinations.push(finalCombinations_sign);
         }
       }
@@ -907,47 +904,80 @@ function generateBasicCombinations(loadCombinations) {
   return allFinalCombinations;
 }
 function join_factor(finalCombinations_sign) {
-  const map = new Map();
+  // Ensure finalCombinations_sign is an object
+  if (typeof finalCombinations_sign === 'object' && finalCombinations_sign !== null) {
+    // Destructure addObj and eitherArray from finalCombinations_sign
+    const { addObj, eitherArray } = finalCombinations_sign;
+    let flattenedEitherArray = [];
+    let flattenedAddObj = [];
 
-  function mergeFactors(arr) {
-    for (const obj of arr) {
-      const key = `${obj.loadCaseName}_${obj.sign}`;
-      // Ensure obj.factor is an array or an empty array
-      if (!Array.isArray(obj.factor)) {
-        obj.factor = [];
-      }
-
-      if (!map.has(key)) {
-        // If not in the map, initialize with this object
-        map.set(key, { ...obj, factor: [...obj.factor] });
-      } else {
-        // If already exists, merge the factor arrays
-        const existingObj = map.get(key);
-        for (let i = 0; i < obj.factor.length; i++) {
-          if (existingObj.factor[i] === undefined && obj.factor[i] !== undefined) {
-            existingObj.factor[i] = obj.factor[i];
-          }
-        }
-      }
+    // Flatten the eitherArray if present
+    if (Array.isArray(eitherArray)) {
+      flattenedEitherArray = eitherArray.flat(1);
     }
-  }
-
-  // Process both eitherArray and addObj
-  if (Array.isArray(finalCombinations_sign)) {
-    finalCombinations_sign.forEach(({ eitherArray, addObj }) => {
-      // Ensure eitherArray and addObj are arrays before processing
-      if (Array.isArray(eitherArray)) {
-        mergeFactors(eitherArray);
-      }
-      if (Array.isArray(addObj)) {
-        mergeFactors(addObj);
-      }
+    // Flatten the addObj if present
+    if (Array.isArray(addObj)) {
+      flattenedAddObj = addObj.flat(1);
+    }
+    // Log to verify the flattened arrays
+    console.log("Flattened eitherArray:", flattenedEitherArray);
+    console.log("Flattened addObj:", flattenedAddObj);
+    // Combine factors from both arrays into a single object
+    const combinedResults = [];
+    const combineFactors = (items) => {
+      let combinedResult = {};
+      items.forEach(item => {
+        const key = `${item.loadCaseName}|${item.sign}`; // Unique key based on loadCaseName and sign
+        if (!combinedResult[key]) {
+          // If the entry does not exist, create it
+          combinedResult[key] = {
+            loadCaseName: item.loadCaseName,
+            sign: item.sign,
+            factor: Array.from({ length: 5 }, () => Array(5).fill(undefined)) // Initialize 5x5 array with undefined
+          };
+        }
+        // Check if item.factor is defined and is an array
+        if (Array.isArray(item.factor) && item.factor.length > 0) {
+          item.factor.forEach((innerArray, index) => {
+            if (Array.isArray(innerArray) && innerArray.length === 5) {
+              innerArray.forEach((value, factorIndex) => {
+                if (value !== undefined) {
+                  combinedResult[key].factor[index][factorIndex] = value; // Fill in the combined factors
+                }
+              });
+            } else {
+              console.warn(`Inner array in factor is not a valid array for key: ${key}`, innerArray);
+            }
+          });
+        } else {
+          console.warn(`item.factor is not a valid array for key: ${key}`, item);
+        }
+      });
+      combinedResults.push(combinedResult);
+    };
+    // Process each item in flattenedEitherArray
+    flattenedEitherArray.forEach(item => {
+      // Log the processing of each eitherArray item
+      console.log("Processing eitherArray item:", item);
+      // Call combineFactors to merge the factor arrays
+      combineFactors(item.flat(1));
     });
+    // Process each item in flattenedAddObj
+    flattenedAddObj.forEach(item => {
+      // Log the processing of each addObj item
+      console.log("Processing addObj item:", item);
+      // Call combineFactors to merge the factor arrays
+      combineFactors(item.flat(1));  
+    });
+    // Convert the combined results back to an array if needed
+    const finalCombinedArray = Object.values(combinedResults);
+    // Log the final combined results
+    console.log("Final Combined Results:", finalCombinedArray);
+    // Return the final combined results for further processing
+    return finalCombinedArray;
   } else {
-    console.error("finalCombinations_sign is not an array or is undefined:", finalCombinations_sign);
+    console.error("finalCombinations_sign is not an object or is null:", finalCombinations_sign);
   }
-  // Convert the map back to an array and return it
-  return Array.from(map.values());
 }
 
 function join(factorCombinations) {
@@ -979,7 +1009,7 @@ function join(factorCombinations) {
               temp.push(obj); 
               generateCombinations(index + 1, temp); 
               temp.pop(); 
-          }
+    }
       }
   
       generateCombinations(0, []); 
@@ -1039,7 +1069,7 @@ function join(factorCombinations) {
                                   // Push the item (which is an array itself) into join
                                   join.push([...item]);
                               }
-                          } else {
+                              } else {
                               // If subArray does not contain multiple arrays, push it directly
                               join.push([...subArray]);
                           }
