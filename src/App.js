@@ -459,7 +459,7 @@ function createNDimensionalArray(dimensions, fillValue = undefined) {
   return new Array(5).fill(undefined).map(() => createNDimensionalArray(dimensions - 1, fillValue));
 }
 
-function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 2) {
+function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 2, factorIndexArray = []) {
   // Initialize factorArray with dynamic dimensions
   let factorArray = createNDimensionalArray(dimension);
 
@@ -479,10 +479,10 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
       } else {
         // If more than 3 dimensions, use recursion to find the innermost array
         let tempArray = targetArray;
-        for (let j = 3; j < dimension; j++) {
+        for (let j = 2; j < dimension; j++) {
           tempArray = tempArray[0];
         }
-        tempArray[0] = multipliedFactor;
+        tempArray = multipliedFactor;
       }
     }
 
@@ -513,17 +513,17 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                   const factorKey = `factor${i}`;
                   let multipliedFactor = eitherLoadCase[factorKey] * value;
                   multipliedFactor = eitherLoadCase[factorKey] !== undefined ? eitherLoadCase[factorKey] * value : 0;
-                  
-                  // Assign to the correct location in the dynamic array
                   let targetArray = factorArray[i - 1][factor - 1];
-                  if (dimension === 3) {
-                    targetArray[0] = multipliedFactor;
+                  if (dimension === 2) {
+                    targetArray = multipliedFactor;
+                    factorArray[i - 1][factor - 1] = targetArray;
                   } else {
-                    let tempArray = targetArray;
-                    for (let j = 3; j < dimension; j++) {
-                      tempArray = tempArray[0];
-                    }
-                    tempArray[0] = multipliedFactor;
+                    let tempArray = factorArray[i-1][factor -1][factor -1];
+                    // for (let j = 3; j < dimension; j++) {
+                    //   tempArray = tempArray[0];
+                    // }
+                    tempArray = multipliedFactor;
+                    factorArray[i-1][factor -1][factor - 1] = tempArray;
                   }
                 }
                 const loadCaseObj = {
@@ -543,7 +543,8 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                 currentFactorValue * value,
                 factorIndex,
                 newSign,
-                dimension + 1 // Increment dimension for recursive calls
+                dimension + 1,// Increment dimension for recursive calls
+                [...factorIndexArray, factorIndex]
               );
             }
           });
@@ -566,16 +567,23 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                   const factorKey = `factor${i}`;
                   let multipliedFactor = addLoadCase[factorKey] * value;
                   multipliedFactor = addLoadCase[factorKey] !== undefined ? addLoadCase[factorKey] * value : 0;
-
+                  // if (addLoadCase[factorKey] == undefined){
+                  //    return;
+                  //  }
+                  // else {
+                  // factorIndexArray.push(i);
+                  // }
                   let targetArray = factorArray[i - 1][factor - 1];
-                  if (dimension === 3) {
-                    targetArray[0] = multipliedFactor;
+                  if (dimension === 2) {
+                    targetArray = multipliedFactor;
+                    factorArray[i - 1][factor - 1] = targetArray;
                   } else {
-                    let tempArray = targetArray;
-                    for (let j = 3; j < dimension; j++) {
-                      tempArray = tempArray[0];
-                    }
-                    tempArray[0] = multipliedFactor;
+                    let tempArray = factorArray[i-1][factor -1][factor -1];
+                    // for (let j = 3; j < dimension; j++) {
+                    //   tempArray = tempArray[0];
+                    // }
+                    tempArray = multipliedFactor;
+                    factorArray[i-1][factor -1][factor - 1] = tempArray;
                   }
                 }
                 const loadCaseObj = {
@@ -595,7 +603,8 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                 currentFactorValue * value,
                 factorIndex,
                 newSign,
-                dimension + 1 // Increment dimension for recursive calls
+                dimension + 1,// Increment dimension for recursive calls
+                [...factorIndexArray, factorIndex] 
               );
             }
           });
@@ -605,7 +614,8 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
       }
     }
   }
-  console.log(result);
+  console.log(factorIndexArray);
+  console.log(result);  
   return result;
 }
 
@@ -1172,6 +1182,7 @@ function generateBasicCombinations(loadCombinations) {
     const sign = loadCase.sign || '+';
     console.log(factors);
         // Call createCombinations with the current factor
+        // const factorIndexArray = [];
         for (let factor = 1; factor <= 5; factor++) {
           const factorObject = factors.find(f => f.factor === factor);
           // Check if the factor value is defined
