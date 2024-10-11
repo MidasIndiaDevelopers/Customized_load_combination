@@ -462,7 +462,6 @@ function createNDimensionalArray(dimensions, fillValue = undefined) {
 function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 2, factorIndexArray = []) {
   // Initialize factorArray with dynamic dimensions
   let factorArray = createNDimensionalArray(dimension);
-
   if (loadNames.includes(loadCases.loadCaseName)) {
     // If loadCaseName exists in loadNames
     for (let i = 1; i <= 5; i++) {
@@ -471,21 +470,26 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
       if (i === factor) {
         multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 0;
       }
+      // const previousFactor = factorIndexArray.length > 0 ? factorIndexArray[factorIndexArray.length - 1 - 1] - 1 : i - 1;
 
-      // Dynamically assign the multipliedFactor at the appropriate level based on dimensions
-      let targetArray = factorArray[i - 1][factor - 1];
-      if (dimension === 2) {
-        targetArray[0] = multipliedFactor;
-      } else {
-        // If more than 3 dimensions, use recursion to find the innermost array
-        let tempArray = targetArray;
-        for (let j = 2; j < dimension; j++) {
-          tempArray = tempArray[0];
-        }
-        tempArray = multipliedFactor;
-      }
+      // const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(previousFactor)); // Adjust for `n` dimensions
+
+      // Set the value in the n-dimensional array using the dynamic indices
+      // Remove the last value from factorIndexArray
+let previousFactorArray = [...factorIndexArray]; // Create a shallow copy of the array
+previousFactorArray.pop(); // Remove the last value
+
+// Fill `previousFactor` array based on dimension - 2
+let previousFactor = previousFactorArray.length > 0 
+  ? previousFactorArray 
+  : [i - 1]; // If factorIndexArray is empty, use [i - 1] as default
+
+// Create indices, adjusting for `n` dimensions
+const indices = [i - 1, factor - 1].concat(
+  new Array(dimension - 2).fill(previousFactor[previousFactor.length - 1] || i - 1)
+);
+      setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, indices);
     }
-
     const loadCaseObj = {
       loadCaseName: loadCases.loadCaseName,
       sign: sign,
@@ -513,18 +517,22 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                   const factorKey = `factor${i}`;
                   let multipliedFactor = eitherLoadCase[factorKey] * value;
                   multipliedFactor = eitherLoadCase[factorKey] !== undefined ? eitherLoadCase[factorKey] * value : 0;
-                  let targetArray = factorArray[i - 1][factor - 1];
-                  if (dimension === 2) {
-                    targetArray = multipliedFactor;
-                    factorArray[i - 1][factor - 1] = targetArray;
-                  } else {
-                    let tempArray = factorArray[i-1][factor -1][factor -1];
-                    // for (let j = 3; j < dimension; j++) {
-                    //   tempArray = tempArray[0];
-                    // }
-                    tempArray = multipliedFactor;
-                    factorArray[i-1][factor -1][factor - 1] = tempArray;
-                  }
+                  // const previousFactor = factorIndexArray.length > 0 ? factorIndexArray[factorIndexArray.length - 1 -1] - 1: i - 1;
+                  // const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(previousFactor)); // Adjust for `n` dimensions
+                  // Remove the last value from factorIndexArray
+let previousFactorArray = [...factorIndexArray]; // Create a shallow copy of the array
+previousFactorArray.pop(); // Remove the last value
+
+// Fill `previousFactor` array based on dimension - 2
+let previousFactor = previousFactorArray.length > 0 
+  ? previousFactorArray 
+  : [i - 1]; // If factorIndexArray is empty, use [i - 1] as default
+
+// Create indices, adjusting for `n` dimensions
+const indices = [i - 1, factor - 1].concat(
+  new Array(dimension - 2).fill(previousFactor[previousFactor.length - 1] || i - 1)
+);
+                  setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, indices);
                 }
                 const loadCaseObj = {
                   loadCaseName: eitherLoadCase.loadCaseName,
@@ -567,24 +575,9 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
                   const factorKey = `factor${i}`;
                   let multipliedFactor = addLoadCase[factorKey] * value;
                   multipliedFactor = addLoadCase[factorKey] !== undefined ? addLoadCase[factorKey] * value : 0;
-                  // if (addLoadCase[factorKey] == undefined){
-                  //    return;
-                  //  }
-                  // else {
-                  // factorIndexArray.push(i);
-                  // }
-                  let targetArray = factorArray[i - 1][factor - 1];
-                  if (dimension === 2) {
-                    targetArray = multipliedFactor;
-                    factorArray[i - 1][factor - 1] = targetArray;
-                  } else {
-                    let tempArray = factorArray[i-1][factor -1][factor -1];
-                    // for (let j = 3; j < dimension; j++) {
-                    //   tempArray = tempArray[0];
-                    // }
-                    tempArray = multipliedFactor;
-                    factorArray[i-1][factor -1][factor - 1] = tempArray;
-                  }
+                  const previousFactor = factorIndexArray.length > 0 ? factorIndexArray[factorIndexArray.length - 1 -1] - 1 : i - 1;
+                  const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(previousFactor)); // Adjust for `n` dimensions
+                  setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, indices);
                 }
                 const loadCaseObj = {
                   loadCaseName: addLoadCase.loadCaseName,
@@ -618,6 +611,108 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
   console.log(result);  
   return result;
 }
+function setFactorArrayValue(factorArray, multipliedFactor, currentDimension, maxDimension, indices) {
+  if (currentDimension === maxDimension) {
+    // We are at the deepest dimension; assign the multiplied factor
+    factorArray[indices[0]] = multipliedFactor;
+  } else {
+    // Recurse deeper by checking the next dimension
+    let nextArray = factorArray[indices[0]];
+    setFactorArrayValue(nextArray, multipliedFactor, currentDimension + 1, maxDimension, indices.slice(1));
+  }
+}
+
+// function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 2, factorIndexArray = []) {
+//   // Initialize factorArray with dynamic dimensions
+//   let factorArray = createNDimensionalArray(dimension);
+  
+//   if (loadNames.includes(loadCases.loadCaseName)) {
+//     for (let i = 1; i <= 5; i++) {
+//       const factorKey = `factor${i}`;
+//       let multipliedFactor = loadCases[factorKey] * value;
+
+//       if (i === factor) {
+//         multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 0;
+//       }
+
+//       // Define the indices for positioning, based on current iteration and factor index
+//       const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(i - 1)); // Adjust for `n` dimensions
+
+//       // Set the value in the n-dimensional array using the dynamic indices
+//       setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, indices);
+//     }
+
+//     const loadCaseObj = {
+//       loadCaseName: loadCases.loadCaseName,
+//       sign: sign,
+//       factor: factorArray
+//     };
+//     result.push(loadCaseObj);
+//   } else {
+//     // Handle the logic for combinations when the load case name isn't in loadNames
+//     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
+//     const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
+
+//     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
+//       if (newLoadCases.type === "Either") {
+//         result["Either"] = result["Either"] || [];
+//         const eitherResult = [];
+        
+//         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
+//           const tempArray = [];
+          
+//           newLoadCases.loadCases.forEach(eitherLoadCase => {
+//             const currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
+//             if (currentFactorValue === undefined) return;
+
+//             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
+//             if (loadNames.includes(eitherLoadCase.loadCaseName)) {
+//               if (factorIndex === 1) {
+//                 factorArray = createNDimensionalArray(dimension);
+                
+//                 for (let i = 1; i <= 5; i++) {
+//                   const factorKey = `factor${i}`;
+//                   let multipliedFactor = eitherLoadCase[factorKey] * value;
+//                   multipliedFactor = eitherLoadCase[factorKey] !== undefined ? eitherLoadCase[factorKey] * value : 0;
+
+//                   const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(i - 1)); // Adjust for `n` dimensions
+//                   setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, indices);
+//                 }
+
+//                 const loadCaseObj = {
+//                   loadCaseName: eitherLoadCase.loadCaseName,
+//                   sign: newSign,
+//                   factor: factorArray
+//                 };
+//                 tempArray.push(loadCaseObj);
+//               }
+//             } else {
+//               createCombinations(
+//                 eitherLoadCase,
+//                 strengthCombination,
+//                 combinations,
+//                 loadNames,
+//                 tempArray,
+//                 currentFactorValue * value,
+//                 factorIndex,
+//                 newSign,
+//                 dimension + 1,  // Increment dimension for recursive calls
+//                 [...factorIndexArray, factorIndex]
+//               );
+//             }
+//           });
+//           eitherResult.push(tempArray);
+//         }
+//         result["Either"].push(eitherResult);
+//       }
+//       // Additional logic for 'Add' type combinations can be handled similarly
+//     }
+//   }
+
+//   console.log(factorIndexArray);
+//   console.log(result);
+//   return result;
+// }
 
 // function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 0) {
 //   // Update factorArray size based on the dimension
@@ -1204,7 +1299,6 @@ function generateBasicCombinations(loadCombinations) {
     const joinedCombinations = join(factorCombinations);
     console.log(joinedCombinations);
     // allFinalCombinations.push(joinedCombinations);
-  
     if (type === 'Add') {
       const joinedComb = [];
     
@@ -1233,9 +1327,8 @@ function generateBasicCombinations(loadCombinations) {
       allFinalCombinations.push(joinedComb);
     }
     if (type === "either") {
-      // Concatenate all arrays in `joinedCombinations` into a single array
       const concatenatedArray = joinedCombinations.flat(); 
-      console.log(concatenatedArray);  // This will be a single array with a size of 2032 if the original sizes were 2, 2, and 2028
+      console.log(concatenatedArray);
     }
 }
   console.log(allFinalCombinations);
@@ -1248,14 +1341,12 @@ function join_factor(finalCombinations_sign) {
       ? arr.reduce((flat, item) => flat.concat(deepFlatten(item)), [])
       : [arr];
   };
-
   // Ensure finalCombinations_sign is an object
   if (typeof finalCombinations_sign === 'object' && finalCombinations_sign !== null) {
     // Destructure addObj and eitherArray from finalCombinations_sign
     const { addObj, eitherArray } = finalCombinations_sign;
     let flattenedEitherArray = [];
     let flattenedAddObj = [];
-
     // Recursively flatten the eitherArray if present
     if (Array.isArray(eitherArray)) {
       flattenedEitherArray = deepFlatten(eitherArray);
@@ -1265,11 +1356,9 @@ function join_factor(finalCombinations_sign) {
     if (Array.isArray(addObj)) {
       flattenedAddObj = deepFlatten(addObj);
     }
-
     // Log to verify the flattened arrays
     console.log("Deep Flattened eitherArray:", flattenedEitherArray);
     console.log("Deep Flattened addObj:", flattenedAddObj);
-
     // Combine factors from both arrays into a single object
     const combinedResults = {};
     const combineFactors = (items) => {
@@ -1354,7 +1443,6 @@ function join_factor(finalCombinations_sign) {
   }
 }
 
-
 function join(factorCombinations) {
   const joinArray = [];
   const allFinalCombinations = [];
@@ -1369,7 +1457,7 @@ function join(factorCombinations) {
       for (const currentArray of arrays) {
         for (const item of currentArray) {
               const flattenedArray = [];
-              flattenedArray.push(...item); // Spread operator to flatten the item
+              flattenedArray.push(...item);
               const joinedArray = flattenedArray.flat();
               console.log(joinedArray);
               eitherjoin.push(joinedArray);
@@ -1394,7 +1482,7 @@ function join(factorCombinations) {
     }
     if (eitherArray && eitherArray.length > 0) {
       const combined = combineArrays(eitherArray);
-      eitherJoin.push(...combined); // Add all combinations to eitherJoin
+      eitherJoin.push(...combined); 
       console.log(eitherJoin);
     }
       // Loop through each array in addObj (or addCombination)
