@@ -6,13 +6,16 @@ import { CheckGroup,Check } from '@midasit-dev/moaui';
 import Sep from "@midasit-dev/moaui/Components/Separator";
 import ExcelReader from './Components/ExcelReader';
 import * as XLSX from 'xlsx';
-import { Panel } from '@midasit-dev/moaui'
-import { Typography } from '@midasit-dev/moaui'
+import { Panel } from '@midasit-dev/moaui';
+import { Typography } from '@midasit-dev/moaui';
 import ComponentsPanelTypographyDropList from './Components/ComponentsPanelTypographyDropList';
 import { Scrollbars } from '@midasit-dev/moaui';
 import ComponentsDialogHelpIconButton from './Components/ComponentsDialogHelpIconButton';
 import { midasAPI } from "./Function/Common";
 import { VerifyUtil, VerifyDialog } from "@midasit-dev/moaui";
+import ExcelJS from 'exceljs';  
+import { saveAs } from 'file-saver'; 
+
 function App() {
 const [selectedLoadCombinationIndex, setSelectedLoadCombinationIndex] = useState(-1);
 const [typeDropdownIndex, setTypeDropdownIndex] = useState(-1); 
@@ -228,9 +231,32 @@ function importLoadCombinationInput(data) {
     setSelectedLoadCombinationIndex(index);
   };
 
-function Export_Load_Combination_Input() {
- 
-}
+  const exportToExcel = () => {
+    // Create a new workbook
+    const workbook = new ExcelJS.Workbook();
+
+    // Add a new worksheet to the workbook
+    const worksheet = workbook.addWorksheet('Load Combinations');
+
+    // Optional: Add headers to the worksheet
+    worksheet.columns = [
+      { header: 'Load Case', key: 'load_case', width: 30 },
+      { header: 'Factor 1', key: 'factor1', width: 15 },
+      { header: 'Factor 2', key: 'factor2', width: 15 }
+    ];
+
+    // Example rows (you can replace this with dynamic data)
+    worksheet.addRow({ load_case: 'Case 1', factor1: 1.5, factor2: 0.9 });
+    worksheet.addRow({ load_case: 'Case 2', factor1: 1.2, factor2: 1.0 });
+
+    // Write the workbook to a buffer and save it as an Excel file
+    workbook.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, 'Load_Combination_Input.xlsx');  // Save the file to the user's system
+    }).catch(err => {
+      console.error('Error creating Excel file:', err);
+    });
+  };
 function getLoadCaseFactors(loadCaseName, combinations) {
   const cleanedLoadCaseName = loadCaseName.replace(/\s*\(CB\)$/, '');
   for (const combo of combinations) {
@@ -240,29 +266,29 @@ function getLoadCaseFactors(loadCaseName, combinations) {
   }
   return null;
 }
-function combineArrays(arrays) {
-  let result = arrays[0] || []; // Start with the first array or an empty array
+// function combineArrays(arrays) {
+//   let result = arrays[0] || []; // Start with the first array or an empty array
   
-  for (let i = 1; i < arrays.length; i++) {
-    const nextArray = arrays[i];
-    const newResult = [];
+//   for (let i = 1; i < arrays.length; i++) {
+//     const nextArray = arrays[i];
+//     const newResult = [];
     
-    for (const resElement of result) {
-      for (const nextElement of nextArray) {
-        // Combine the current result with the next element
-        newResult.push([...resElement, nextElement]);
-      }
-    }
+//     for (const resElement of result) {
+//       for (const nextElement of nextArray) {
+//         // Combine the current result with the next element
+//         newResult.push([...resElement, nextElement]);
+//       }
+//     }
     
-    result = newResult;
-  }
+//     result = newResult;
+//   }
   
-  return result;
-}
-function generatePermutationsOfCombinations(basicCombinations) {
-  const allPermutations = combineArrays(basicCombinations);
-  return allPermutations;
-}
+//   return result;
+// }
+// function generatePermutationsOfCombinations(basicCombinations) {
+//   const allPermutations = combineArrays(basicCombinations);
+//   return allPermutations;
+// }
 function handleSignCases(sign, loadCase, factor) {  
   const result = [];
   if (sign === "+") {
@@ -277,181 +303,6 @@ function handleSignCases(sign, loadCase, factor) {
   }
   return result;
 }
-// function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, factors, factor,factorArray, sign) {
-//   if (loadNames.includes(loadCases.loadCaseName)) {
-//     // Update the loadCaseObj with sign
-//     const loadCaseObj = {
-//       loadCaseName: loadCases.loadCaseName,
-//       sign: sign,
-//       factor: factors
-//     };
-
-//     result.push(loadCaseObj);
-//   } else {
-//     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-//     const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
-
-//     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
-//       if (newLoadCases.type === "Either") {
-//         result["Either"] = result["Either"] || [];
-//         const eitherResult = [];
-
-//         for (let factor = 1; factor <= 5; factor++) {
-//           const tempArray = [];
-//           newLoadCases.loadCases.forEach(eitherLoadCase => {
-//             const currentFactorValue = eitherLoadCase[`factor${factor}`];
-//             if (currentFactorValue === undefined) return;
-//             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
-//             createCombinations(eitherLoadCase, strengthCombination, combinations, loadNames, tempArray, currentFactorValue * factors, factor, newSign);
-//           });
-
-//           eitherResult.push(tempArray);
-//         }
-
-//         result["Either"].push(eitherResult);
-//       } else if (newLoadCases.type === "Add") {
-//         result["Add"] = result["Add"] || [];
-//         const addResult = [];
-
-//         for (let factor = 1; factor <= 5; factor++) {
-//           const tempArray_add = [];
-
-//           newLoadCases.loadCases.forEach(addLoadCase => {
-//             const currentFactorValue = addLoadCase[`factor${factor}`];
-//             if (currentFactorValue === undefined) return;
-
-//             // Multiply signs as well as factors
-//             const newSign = multiplySigns(sign, addLoadCase.sign || '+');
-//             createCombinations(addLoadCase, strengthCombination, combinations, loadNames, tempArray_add, currentFactorValue * factors, factor, newSign);
-//           });
-
-//           addResult.push(tempArray_add);
-//         }
-
-//         result["Add"].push(addResult);
-//       }
-//     } else {
-//       console.error(`Load case ${loadCases.loadCaseName} not found in combinations.`);
-//     }
-//   }
-//   console.log(result);
-//   return result;
-// }
-// function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign) {
-//   // Initialize factorArray as a 5x5 matrix
-//   let factorArray = new Array(5).fill(undefined).map(() => new Array(5).fill(undefined));
-
-//   if (loadNames.includes(loadCases.loadCaseName)) {
-//     // Iterate through factors 1 to 5
-//     for (let i = 1; i <= 5; i++) {
-//       const factorKey = `factor${i}`;    
-//       // Multiply the factor by the corresponding value
-//       let multipliedFactor = loadCases[factorKey] * value;
-//       if ( i ==  factor) {
-//          multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 1;
-//       }
-//       // Ensure the factorArray[factor] is initialized correctly
-//       if (!Array.isArray(factorArray[factor])) {
-//         factorArray[factor-1] = new Array(5).fill(undefined);
-//       }
-//       // Store the multiplied factor in the factorArray at the correct index (i-1 because array is 0-based)
-//       factorArray[factor-1][i - 1] = multipliedFactor;
-//     }
-//     // Create the loadCaseObj with the entire factorArray
-//     const loadCaseObj = {
-//       loadCaseName: loadCases.loadCaseName,
-//       sign: sign,
-//       factor: factorArray // Here you store the whole factorArray in the object
-//     };
-    
-//     // Add this loadCaseObj to the result array
-//     result.push(loadCaseObj);
-
-//   } else {
-//     // Handle cases where the loadCaseName is not in loadNames
-//     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-//     const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
-
-//     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
-//       if (newLoadCases.type === "Either") {
-//         result["Either"] = result["Either"] || [];
-//         const eitherResult = [];
-
-//         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
-//           const tempArray = [];
-
-//           newLoadCases.loadCases.forEach(eitherLoadCase => {
-//             const currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
-//             if (currentFactorValue === undefined) return;
-
-//             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
-
-//             if (!Array.isArray(factorArray[factor])) {
-//               factorArray[factor] = new Array(5).fill(undefined);
-//             }
-
-//             const multipliedFactor = currentFactorValue * value;
-
-//             factorArray[factor][factorIndex - 1] = multipliedFactor;
-
-//             createCombinations(
-//               eitherLoadCase,
-//               strengthCombination,
-//               combinations,
-//               loadNames,
-//               tempArray,
-//               multipliedFactor,
-//               factorIndex,
-//               newSign
-//             );
-//           });
-
-//           eitherResult.push(tempArray);
-//         }
-
-//         result["Either"].push(eitherResult);
-//       } else if (newLoadCases.type === "Add") {
-//         result["Add"] = result["Add"] || [];
-//         const addResult = [];
-
-//         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
-//           const tempArray_add = [];
-
-//           newLoadCases.loadCases.forEach(addLoadCase => {
-//             const currentFactorValue = addLoadCase[`factor${factorIndex}`];
-//             if (currentFactorValue === undefined) return;
-
-//             const newSign = multiplySigns(sign, addLoadCase.sign || '+');
-
-//             if (!Array.isArray(factorArray[factor])) {
-//               factorArray[factor] = new Array(5).fill(undefined);
-//             }
-//             const multipliedFactor = currentFactorValue * value;
-//             factorArray[factor][factorIndex - 1] = multipliedFactor;
-
-//             createCombinations(
-//               addLoadCase,
-//               strengthCombination,
-//               combinations,
-//               loadNames,
-//               tempArray_add,
-//               multipliedFactor,
-//               factorIndex,
-//               newSign
-//             );
-//           });
-//           addResult.push(tempArray_add);
-//         }
-//         result["Add"].push(addResult);
-//       }
-//     } else {
-//       console.error(`Load case ${loadCases.loadCaseName} not found in combinations.`);
-//     }
-//   }
-//   console.log(factorArray); // Check how the factorArray looks
-//   console.log(result); // Check how the result is accumulating
-//   return result;
-// }
 
 // Helper function to create an n-dimensional array
 function createNDimensionalArray(dimensions, fillValue = undefined) {
@@ -673,394 +524,6 @@ function setFactorArrayValue(factorArray, multipliedFactor, currentDimension, ma
     setFactorArrayValue(nextArray, multipliedFactor, currentDimension + 1, maxDimension, indices.slice(1));
   }
 }
-
-// function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 2, factorIndexArray = []) {
-//   // Initialize factorArray with dynamic dimensions
-//   let factorArray = createNDimensionalArray(dimension);
-  
-//   if (loadNames.includes(loadCases.loadCaseName)) {
-//     for (let i = 1; i <= 5; i++) {
-//       const factorKey = `factor${i}`;
-//       let multipliedFactor = loadCases[factorKey] * value;
-
-//       if (i === factor) {
-//         multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 0;
-//       }
-
-//       // Define the indices for positioning, based on current iteration and factor index
-//       const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(i - 1)); // Adjust for `n` dimensions
-
-//       // Set the value in the n-dimensional array using the dynamic indices
-//       setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, indices);
-//     }
-
-//     const loadCaseObj = {
-//       loadCaseName: loadCases.loadCaseName,
-//       sign: sign,
-//       factor: factorArray
-//     };
-//     result.push(loadCaseObj);
-//   } else {
-//     // Handle the logic for combinations when the load case name isn't in loadNames
-//     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-//     const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
-
-//     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
-//       if (newLoadCases.type === "Either") {
-//         result["Either"] = result["Either"] || [];
-//         const eitherResult = [];
-        
-//         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
-//           const tempArray = [];
-          
-//           newLoadCases.loadCases.forEach(eitherLoadCase => {
-//             const currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
-//             if (currentFactorValue === undefined) return;
-
-//             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
-//             if (loadNames.includes(eitherLoadCase.loadCaseName)) {
-//               if (factorIndex === 1) {
-//                 factorArray = createNDimensionalArray(dimension);
-                
-//                 for (let i = 1; i <= 5; i++) {
-//                   const factorKey = `factor${i}`;
-//                   let multipliedFactor = eitherLoadCase[factorKey] * value;
-//                   multipliedFactor = eitherLoadCase[factorKey] !== undefined ? eitherLoadCase[factorKey] * value : 0;
-
-//                   const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(i - 1)); // Adjust for `n` dimensions
-//                   setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, indices);
-//                 }
-
-//                 const loadCaseObj = {
-//                   loadCaseName: eitherLoadCase.loadCaseName,
-//                   sign: newSign,
-//                   factor: factorArray
-//                 };
-//                 tempArray.push(loadCaseObj);
-//               }
-//             } else {
-//               createCombinations(
-//                 eitherLoadCase,
-//                 strengthCombination,
-//                 combinations,
-//                 loadNames,
-//                 tempArray,
-//                 currentFactorValue * value,
-//                 factorIndex,
-//                 newSign,
-//                 dimension + 1,  // Increment dimension for recursive calls
-//                 [...factorIndexArray, factorIndex]
-//               );
-//             }
-//           });
-//           eitherResult.push(tempArray);
-//         }
-//         result["Either"].push(eitherResult);
-//       }
-//       // Additional logic for 'Add' type combinations can be handled similarly
-//     }
-//   }
-
-//   console.log(factorIndexArray);
-//   console.log(result);
-//   return result;
-// }
-
-// function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 0) {
-//   // Update factorArray size based on the dimension
-//   let factorArray = new Array(5).fill(undefined).map(() => new Array(5).fill(undefined));
-
-//   if (loadNames.includes(loadCases.loadCaseName)) {
-//     // If loadCaseName exists in loadNames
-//     for (let i = 1; i <= 5; i++) {
-//       const factorKey = `factor${i}`;
-//       let multipliedFactor = loadCases[factorKey] * value;
-//       if (i === factor) {
-//         multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 0;
-//       }
-//       if (!Array.isArray(factorArray[factor - 1])) {
-//         factorArray[factor - 1] = new Array(5).fill(undefined);
-//       }
-//       factorArray[i - 1][factor - 1] = multipliedFactor;
-//     }
-
-//     const loadCaseObj = {
-//       loadCaseName: loadCases.loadCaseName,
-//       sign: sign,
-//       factor: factorArray
-//     };
-//     result.push(loadCaseObj);
-//   } else {
-//     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-//     const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
-    
-//     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
-//       if (newLoadCases.type === "Either") {
-//         result["Either"] = result["Either"] || [];
-//         const eitherResult = [];
-        
-//         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
-//           const tempArray = [];
-          
-//           newLoadCases.loadCases.forEach(eitherLoadCase => {
-//             const currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
-//             if (currentFactorValue === undefined) return;
-//             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
-            
-//             if (loadNames.includes(eitherLoadCase.loadCaseName)) {
-//               if (factorIndex == 1) {
-//                 // Reinitialize factorArray for the first factor
-//                 factorArray = new Array(dimension + 5).fill(undefined).map(() => new Array(dimension + 5).fill(undefined));
-                
-//                 for (let i = 1; i <= 5; i++) {
-//                   const factorKey = `factor${i}`;
-//                   let multipliedFactor = eitherLoadCase[factorKey] * value;
-//                   multipliedFactor = eitherLoadCase[factorKey] !== undefined ? eitherLoadCase[factorKey] * value : 0;
-//                   if (!Array.isArray(factorArray[factor - 1])) {
-//                     factorArray[factor - 1] = new Array(dimension + 5).fill(undefined);
-//                   }
-//                   factorArray[i - 1][factor - 1] = multipliedFactor;
-//                 }
-
-//                 const loadCaseObj = {
-//                   loadCaseName: eitherLoadCase.loadCaseName,
-//                   sign: newSign,
-//                   factor: factorArray
-//                 };
-//                 tempArray.push(loadCaseObj);
-//               }
-//             } else {
-//               // Recursive call with incremented dimension count
-//               createCombinations(
-//                 eitherLoadCase,
-//                 strengthCombination,
-//                 combinations,
-//                 loadNames,
-//                 tempArray,
-//                 currentFactorValue * value,
-//                 factorIndex,
-//                 newSign,
-//                 dimension + 1 // Increment the dimension
-//               );
-//             }
-//           });
-//           eitherResult.push(tempArray);
-//         }
-//         result["Either"].push(eitherResult);
-//       } else if (newLoadCases.type === "Add") {
-//         result["Add"] = result["Add"] || [];
-//         let addResult = [];
-        
-//         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
-//           let tempArray_add = [];
-          
-//           newLoadCases.loadCases.forEach(addLoadCase => {
-//             const currentFactorValue = addLoadCase[`factor${factorIndex}`];
-//             if (currentFactorValue === undefined) return;
-//             const newSign = multiplySigns(sign, addLoadCase.sign || '+');
-            
-//             if (loadNames.includes(addLoadCase.loadCaseName)) {
-//               if (factorIndex == 1) {
-//                 // Reinitialize factorArray for the first factor
-//                 factorArray = new Array(dimension + 5).fill(undefined).map(() => new Array(dimension + 5).fill(undefined));
-                
-//                 for (let i = 1; i <= 5; i++) {
-//                   const factorKey = `factor${i}`;
-//                   let multipliedFactor = addLoadCase[factorKey] * value;
-//                   multipliedFactor = addLoadCase[factorKey] !== undefined ? addLoadCase[factorKey] * value : 0;
-//                   if (!Array.isArray(factorArray[factor - 1])) {
-//                     factorArray[factor - 1] = new Array(dimension + 5).fill(undefined);
-//                   }
-//                   factorArray[i - 1][factor - 1] = multipliedFactor;
-//                 }
-
-//                 const loadCaseObj = {
-//                   loadCaseName: addLoadCase.loadCaseName,
-//                   sign: newSign,
-//                   factor: factorArray
-//                 };
-//                 tempArray_add.push(loadCaseObj);
-//               }
-//             } else {
-//               // Recursive call with incremented dimension count
-//               createCombinations(
-//                 addLoadCase,
-//                 strengthCombination,
-//                 combinations,
-//                 loadNames,
-//                 tempArray_add,
-//                 currentFactorValue * value,
-//                 factorIndex,
-//                 newSign,
-//                 dimension + 1 // Increment the dimension
-//               );
-//             }
-//           });
-//           addResult.push(tempArray_add);
-//         } 
-//         result["Add"].push(addResult);
-//       }
-//     }
-//   }
-//   console.log(result);
-//   return result;
-// }
-
-// function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign) {
-//   // Initialize a simple 5x5 factor array
-//   let factorArray = new Array(5).fill(null).map(() => new Array(5).fill(null));
-//   // Function to fill the array based on the loadCase and value
-//   const processArray = (loadCase, value) => {
-//     for (let i = 0; i < factorArray.length; i++) {
-//       for (let j = 0; j < factorArray[i].length; j++) {
-//         // Dynamically construct the factor key
-//         const factorKey = `factor${i + 1}`;
-//         const factorValue = loadCase[factorKey];
-//         factorArray[i][j] = factorValue !== undefined ? factorValue * value : 0;
-//       }
-//     }
-//   };
-//   // Check if loadCaseName is present in loadNames
-//   if (loadNames.includes(loadCases.loadCaseName)) {
-//     processArray(loadCases, value);
-//     // Store the result
-//     result.push({
-//       loadCaseName: loadCases.loadCaseName,
-//       sign: sign,
-//       factor: factorArray,
-//     });
-//   } else {
-//     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-//     const newLoadCases = combinations.find(
-//       (combo) => combo.loadCombination === modifyName.loadCombination
-//     );
-
-//     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
-//       newLoadCases.loadCases.forEach((eitherLoadCase) => {
-//         const factorValue = eitherLoadCase[`factor${factor}`];
-//         if (factorValue === undefined) return;
-
-//         const newSign = multiplySigns(sign, eitherLoadCase.sign || "+");
-
-//         if (loadNames.includes(eitherLoadCase.loadCaseName)) {
-//           processArray(eitherLoadCase, value);
-//           result.push({
-//             loadCaseName: eitherLoadCase.loadCaseName,
-//             sign: newSign,
-//             factor: factorArray,
-//           });
-//         } else {
-//           // Recursive call for nested load cases
-//           createCombinations(
-//             eitherLoadCase,
-//             strengthCombination,
-//             combinations,
-//             loadNames,
-//             result,
-//             factorValue * value,
-//             factor,
-//             newSign
-//           );
-//         }
-//       });
-//     }
-//   }
-
-//   console.log(result);
-//   return result;
-// }
-
-// function createNestedArray(depth, size) {
-//   let nestedArray = new Array(size).fill(null);
-
-//   for (let i = 1; i < depth; i++) {
-//     // At each depth level, map through the current array and replace each element with a new array
-//     nestedArray = nestedArray.map(() => new Array(size).fill(null));
-//   }
-
-//   return nestedArray;
-// }
-
-// // Main function to process load cases and fill the factor array
-// function processArray(loadCase, value, array, currentDepth, size) {
-//   // Check if the current array is initialized, if not, initialize it
-//   if (!array) {
-//     array = new Array(size).fill(null);
-//   }
-//   // Base case: if the current depth is 1, stop further recursion
-//   if (currentDepth === 1) {
-//     // At the deepest level, fill the array with the calculated factor values
-//     for (let i = 0; i < array.length; i++) {
-//       const factorKey = `factor${i + 1}`;
-//       const factorValue = loadCase[factorKey];
-//       array[i] = factorValue !== undefined ? factorValue * value : 0;
-//     }
-//   } else {
-//     // Iterate over each nested array and continue processing
-//     for (let i = 0; i < array.length; i++) {
-//       // Recursively process the next depth, ensure the next level is initialized
-//       if (!array[i]) {
-//         array[i] = new Array(size).fill(null); // Initialize the next nested array if it's null
-//       }
-//       processArray(loadCase, value, array[i], currentDepth - 1, size); // Go deeper by decreasing depth
-//     }
-//   }
-//   return array; // Return the updated array for further processing
-// }
- 
-// // Example usage of the modified processArray
-// function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, depth) {
-//   const size = 5; // Assuming size is 5 based on earlier examples
-//   let factorArray = createNestedArray(depth, size);  // Creates a 5x5x... array depending on `depth`
-//   // Main logic for checking and processing load cases
-//   if (loadNames.includes(loadCases.loadCaseName)) {
-//     // If the load case is valid, process it and store it in factorArray
-//     factorArray = processArray(loadCases, value, factorArray, depth, size);
-//     result.push({
-//       loadCaseName: loadCases.loadCaseName,
-//       sign: sign,
-//       factor: factorArray,
-//     });
-//   } else {
-//     // Handle combinations and recursive cases
-//     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-//     const newLoadCases = combinations.find(
-//       (combo) => combo.loadCombination === modifyName.loadCombination
-//     );
-//     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
-//       newLoadCases.loadCases.forEach((eitherLoadCase) => {
-//         const factorValue = eitherLoadCase[`factor${factor}`];
-//         if (factorValue === undefined) return;
-
-//         const newSign = multiplySigns(sign, eitherLoadCase.sign || "+");
-
-//         if (loadNames.includes(eitherLoadCase.loadCaseName)) {
-//           factorArray = processArray(eitherLoadCase, value, factorArray, depth, size);
-
-//           result.push({
-//             loadCaseName: eitherLoadCase.loadCaseName,
-//             sign: newSign,
-//             factor: factorArray,
-//           });
-//         } else {
-//           createCombinations(
-//             eitherLoadCase,
-//             strengthCombination,
-//             combinations,
-//             loadNames,
-//             result,
-//             factorValue * value,
-//             factor,
-//             newSign,
-//             depth
-//           );
-//         }
-//       });
-//     }
-//   }
-//   console.log(result);
-//   return result;
-// }
 
 function multiplySigns(sign1, sign2) {
   // Handle basic sign multiplication
@@ -1699,7 +1162,32 @@ function join_factor(finalCombinations_sign) {
         }
       });
     }
-
+    if (Array.isArray(addObj)) {
+      const numSubArrays = addObj[0].length; // Get the number of sub-arrays
+      // Loop through each index of the sub-arrays
+      for (let j = 0; j < 10; j++) {
+        const combinedArray = []; 
+      for (let i = 0; i < 5; i++) {
+        // Reset combinedArray for the current index
+          addObj[0].forEach(arr => {
+              if (Array.isArray(arr)) {
+                const subArr = arr; // This is the array that contains multiple sub-arrays
+                // Make sure the subArr[i] exists (not out of bounds)
+                if (Array.isArray(subArr[i])) {
+                    // Push the i-th element from each sub-array in subArr to combinedArray
+                    subArr[i].forEach(item => {
+                        combinedArray.push(item[j]);
+                    });
+                } else {
+                    // Handle the case where it's not an array
+                    combinedArray.push(subArr[i]);
+                }
+            }  
+          });
+          // After collecting all items for the current index, flatten and push to flattenedAddObj
+          flattenedAddObj.push(deepFlatten(combinedArray));
+      }
+  } }
     // Flatten each array inside addObj individually
     // if (Array.isArray(addObj)) {
     //   addObj.forEach(arr => {
@@ -1719,17 +1207,14 @@ function join_factor(finalCombinations_sign) {
     // Log to verify the individually flattened arrays
     console.log("Individually Flattened eitherArray:", flattenedEitherArray);
     console.log("Individually Flattened addObj:", flattenedAddObj);
-
     // Combine factors from both arrays into a single object
     const combinedResults = {};
     const combineFactors = (items) => {
       let combinedResult = {};
-
       items.forEach(item => {
         // Only process objects with loadCaseName and factor properties
         if (item && typeof item === 'object' && item.loadCaseName && item.factor) {
-          const key = `${item.loadCaseName}|${item.sign}`; // Unique key based on loadCaseName and sign
-
+          const key = `${item.loadCaseName}|${item.sign}`;
           if (!combinedResult[key]) {
             // If the entry does not exist, create it
             combinedResult[key] = {
@@ -1738,11 +1223,9 @@ function join_factor(finalCombinations_sign) {
               factor: []
             };
           }
-          // Merge factors, regardless of their dimensionality
           mergeFactors(combinedResult[key].factor, item.factor);
         }
       });
-
       Object.keys(combinedResult).forEach(key => {
         if (!combinedResults[key]) {
           combinedResults[key] = combinedResult[key];
@@ -1821,8 +1304,71 @@ function join_factor(finalCombinations_sign) {
 //     }
 //   }
 // }
+const commonArray_Add = [];
+if (Array.isArray(addObj)) {
+  addObj.forEach(currentArray => {
+    if (Array.isArray(currentArray) && currentArray.length > 0) {
+      const result = {}; // Object to hold merged results for this array
+      const length = currentArray[0].length; // Get the length of the current outer array
 
-    // console.log("Final Common Array of Results: Add", commonArray_Add);
+      // Iterate through each index of the first inner array (assuming all sub-arrays have the same length)
+      for (let i = 0; i < length; i++) {
+        const combinedFactors = []; // Array to hold the factors for the current index
+
+        // Loop through each item in the current outer array
+        currentArray.forEach(item => {
+          // Check if the item is an object and contains loadCaseName and factor
+          if (item && typeof item === 'object' && item.loadCaseName && item.factor) {
+            const key = `${item.loadCaseName}|${item.sign}`;
+            
+            // Initialize the result object if it doesn't exist
+            if (!result[key]) {
+              result[key] = {
+                loadCaseName: item.loadCaseName,
+                sign: item.sign,
+                factor: []
+              };
+            }
+
+            // Ensure the factor array exists for this index
+            if (!result[key].factor[i]) {
+              result[key].factor[i] = []; // Initialize if undefined
+            }
+
+            // If the item contains factors, merge them
+            if (Array.isArray(item.factor[i])) {
+              // Merge existing factors with new factors
+              mergeFactors(result[key].factor[i], item.factor[i]);
+            }
+            
+            // Handle case where item itself may contain multiple items
+            if (Array.isArray(item)) {
+              item.forEach(innerItem => {
+                if (innerItem && innerItem.loadCaseName && innerItem.factor) {
+                  const innerKey = `${innerItem.loadCaseName}|${innerItem.sign}`;
+                  if (!result[innerKey]) {
+                    result[innerKey] = {
+                      loadCaseName: innerItem.loadCaseName,
+                      sign: innerItem.sign,
+                      factor: []
+                    };
+                  }
+                  if (Array.isArray(innerItem.factor[i])) {
+                    mergeFactors(result[innerKey].factor[i], innerItem.factor[i]);
+                  }
+                }
+              });
+            }
+          }
+        });
+      }
+      // Push the merged results for the current outer array
+      commonArray_Add.push(result);
+    }
+  });
+}
+
+    console.log("Final Common Array of Results: Add", commonArray_Add);
     console.log("Final Common Array of Results: Either", commonArray_Either);
     return {
       add: addObj,
@@ -1856,7 +1402,6 @@ function join(factorCombinations) {
             const nvalue = factor[i][i]
             return getSingleFactor([nvalue], index); // Corrected to pass 'i' instead of 0
           }
-  
           return value; // Return the non-array value
         }
       }
@@ -2069,7 +1614,6 @@ if (either && either.length > 0) {
         
           currentFactorCombination.push(combinedResult); // Add the result to the combination array
        } });
-    
         // Push the current factor combination array to allCombinations
         if (currentFactorCombination.length > 0) {
           allCombinations.push(currentFactorCombination);
@@ -2469,10 +2013,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
     setLoadCombinations(updatedLoadCombinations);
   };
   const LoadCaseComponent = ({ loadCase, loadCaseIndex, updateLoadCase }) => {
-    // const handleFactorBlur = (index, factorKey, value) => {
-    //   updateLoadCase(index, factorKey, value);
-    // };
-  
+   
     const handleFactorClick = (e) => {
       const range = document.createRange();
       const sel = window.getSelection();
@@ -2485,10 +2026,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   //Main UI
   return (
 	<div className="App" >
-		{/* {showDialog && <MKeyDialog />}
-		{showDialog && <VerifyDialog />} */}
     {showDialog && <VerifyDialog />}
-
 		<GuideBox
 			padding={2}
 			center
@@ -2521,14 +2059,6 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                {loadCombinations.map((combo, index) => (
       <div key={index} style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #ccc', cursor: 'pointer', backgroundColor: selectedLoadCombinationIndex === index ? '#f0f0f0' : 'white' }} onClick={() => handleLoadCombinationClick(index)}>
         <div style={{ flex: '0 0 140px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}>
-          {/* <Typography>{combo.loadCombination}</Typography> */}
-        {/* <input
-                        type="text"
-                        value={combo.loadCombination}
-                        onChange={(e) => handleLoadCombinationChange(index, 'loadCombination', e.target.value)}
-                        placeholder=" " 
-                        style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent' }}
-                      /> */}
                       {index === loadCombinations.length - 1 ? (
                         <input
                           type="text"
@@ -2551,7 +2081,6 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                         <Typography>{combo.loadCombination}</Typography>
                       )}
              </div>
-        {/* <div style={{ flex: '1 1 65px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}><Typography>{combo.active}</Typography></div> */}
         <div
               style={{
                 flex: '1 1 65px',
@@ -2707,7 +2236,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
           </div>
         )}
       </div>
-       <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }} onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor1', e.currentTarget.textContent)}
+       {/* <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }} onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor1', e.currentTarget.textContent)}
   contentEditable
   suppressContentEditableWarning>
         <Typography>{loadCase.factor1 !== undefined ? loadCase.factor1 : " "}</Typography>
@@ -2731,7 +2260,19 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   contentEditable
   suppressContentEditableWarning>
         <Typography>{loadCase.factor5 !== undefined ? loadCase.factor5 : " "}</Typography>
-        </div>
+        </div> */}
+        {/* Factor Fields */}
+    {['factor1', 'factor2', 'factor3', 'factor4', 'factor5'].map((factorKey, factorIndex) => (
+      <div
+        key={factorIndex}
+        style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text', fontSize: '12px' }}
+        contentEditable
+        suppressContentEditableWarning
+        onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, factorKey, e.currentTarget.textContent)}
+      >  
+        {loadCase[factorKey] !== undefined ? loadCase[factorKey] : " "}
+      </div>
+    ))}
          <div>
       {/* {loadCombinations.map((loadCombination, combinationIndex) => (
         <div key={combinationIndex}>
@@ -2779,7 +2320,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   </Panel>
       <div style={{  width: '780px', height: '25px', display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly', backgroundColor: 'white', padding: '10px'}}>
       {Buttons.SubButton("contained", "Import Load Cases", Import_Load_Cases)}
-      {Buttons.SubButton("contained", "Export Load Combination",Export_Load_Combination_Input)}
+      {Buttons.SubButton("contained", "Export Load Combination",exportToExcel)}
       {Buttons.SubButton("contained", "Import Load Combination",toggleExcelReader)}
       {Buttons.SubButton("contained", "Generate Load Combination",Generate_Load_Combination)}
       </div>
