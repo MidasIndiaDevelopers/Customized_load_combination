@@ -1,7 +1,7 @@
 import React from 'react'; 
 import { Panel, Stack, Typography, DropList } from "@midasit-dev/moaui"; 
 
-const ComponentsPanelTypographyDropList = ({ 
+const ComponentsPanelTypographyDropList = ({
 	title = "Generate load combination in:",
 	items = new Map([
 		['Steel Design', 1],
@@ -9,11 +9,17 @@ const ComponentsPanelTypographyDropList = ({
 		['SRC Design', 3],
 		['Composite Steel Girder', 4]
 	]),
+	selectedValue, // Accept the selected value from the parent
+	onValueChange  // Accept the handler to pass changes back to the parent
 }) => {
 	const [values, setValues] = React.useState({
-    selected: 1,
-    items: items
-  });
+		selected: selectedValue,
+		items: items
+	});
+
+	React.useEffect(() => {
+		setValues({ ...values, selected: selectedValue });
+	}, [selectedValue]); // Update internal state when the selectedValue prop changes
 
 	return (
 		<Panel width={280} height={40}  paddingLeft={0} paddingTop={1} variant='Box'>
@@ -29,7 +35,11 @@ const ComponentsPanelTypographyDropList = ({
 					width="150px" 
 					defaultValue="Steel Design"
 					value={values.selected}
-					onChange={(e) => setValues({...values, selected: Number(e.target.value)})}
+					onChange={(e) => {
+						const newValue = Number(e.target.value);
+						setValues({ ...values, selected: newValue });
+						onValueChange(newValue); // Pass the new value back to the parent
+					}}
 				/>
 			</Stack>
 		</Panel>
