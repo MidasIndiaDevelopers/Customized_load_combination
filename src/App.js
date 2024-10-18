@@ -14,7 +14,8 @@ import ComponentsDialogHelpIconButton from './Components/ComponentsDialogHelpIco
 import { midasAPI } from "./Function/Common";
 import { VerifyUtil, VerifyDialog } from "@midasit-dev/moaui";
 import ExcelJS from 'exceljs';  
-import { saveAs } from 'file-saver'; 
+import { saveAs } from 'file-saver';
+ 
 
 function App() {
 const [selectedLoadCombinationIndex, setSelectedLoadCombinationIndex] = useState(-1);
@@ -739,6 +740,7 @@ function generateBasicCombinations(loadCombinations) {
     return [];
   }
   const allFinalCombinations = [];
+  const civil_com = { "Assign": {} };
   // Iterate over each strengthCombination
   for (const strengthCombination of strengthCombinations) {
     const comb_name = strengthCombination.loadCombination;
@@ -811,19 +813,25 @@ function generateBasicCombinations(loadCombinations) {
       allFinalCombinations.push(joinedComb);
       joinedComb.forEach((combArray, idx) => {
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
-        const civil_com = { "Assign": {"[idx + 1]":{
+        
+        // Prepare the vCOMB structure for this combination
+        const vCOMB = combArray.map((comb) => ({
+          "ANAL": "RS", // Assuming "RS" is the analysis type, you can replace it if needed
+          "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
+          "FACTOR": comb.sign * comb.factor // Assuming comb has properties `sign` and `factor`
+        }));
+  
+        // Add this combination to the civil_com object under Assign
+        civil_com.Assign[idx + 1] = {
           "NAME": combinationName,
-          "ACTIVE": "ACTIVE",
-          "bCB": false,
-          "iTYPE": 0,
-          "DESC": "",
-          "vCOMB": combArray.map((comb) => ({
-            "ANAL": "RS",
-            "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
-            "FACTOR": comb.sign * comb.factor // Assuming comb has properties `sign` and `factor`
-        }}}))
+          "KIND": "GEN",          // Setting "KIND" to "GEN" as specified
+          "ACTIVE": "INACTIVE",   // Setting "ACTIVE" to "INACTIVE"
+          "iTYPE": 0,             // Setting "iTYPE" to 0 as specified
+          "DESC": "desc",         // You can modify the description as needed
+          "vCOMB": vCOMB          // The vCOMB array containing combinations
         };
       });
+    console.log(civil_com);
     }
     if (type === "either") {
       const concatenatedArray = joinedCombinations.flat(); 
@@ -831,6 +839,7 @@ function generateBasicCombinations(loadCombinations) {
     }
 }
   console.log(allFinalCombinations);
+  
   return allFinalCombinations;
 }
 function join_factor(finalCombinations_sign) {
