@@ -15,7 +15,6 @@ import { midasAPI } from "./Function/Common";
 import { VerifyUtil, VerifyDialog } from "@midasit-dev/moaui";
 import ExcelJS from 'exceljs';  
 import { saveAs } from 'file-saver';
- 
 
 function App() {
 const [selectedLoadCombinationIndex, setSelectedLoadCombinationIndex] = useState(-1);
@@ -733,7 +732,7 @@ function findStrengthCombinations(combinations) {
   return combinations.filter(combo => combo.active === "Strength");
 }
 
-function generateBasicCombinations(loadCombinations) {
+async function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
   if (strengthCombinations.length === 0) {
     console.error("No combinations with active set to 'Strength' found.");
@@ -816,7 +815,35 @@ function generateBasicCombinations(loadCombinations) {
         
         // Prepare the vCOMB structure for this combination
         const vCOMB = combArray.map((comb) => ({
-          "ANAL": "RS", // Assuming "RS" is the analysis type, you can replace it if needed
+          "ANAL": "ST", // Replace "RS" with your required analysis type
+          "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
+          "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
+        }));
+      
+        // Add this combination to the civil_com object under "Assign" using dynamic key with brackets
+        civil_com["Assign"] = civil_com["Assign"] || {}; // Ensure "Assign" exists
+        civil_com["Assign"][`${idx + 1}`] = {
+          "NAME": combinationName,    // Name of the combination
+          "ACTIVE": "ACTIVE",         // Set "ACTIVE" as per your requirement
+          "bCB": false,               // Set bCB value as per your requirement
+          "iTYPE": 0,                 // Set iTYPE value as per your requirement  
+          "vCOMB": vCOMB              // vCOMB contains the combinations
+        };
+      });
+      
+      // Verify the object structure
+    const civilComJson = JSON.stringify(civil_com, null, 2);
+    console.log(civilComJson);  // This ensures that the JSON is correctly formatted with commas
+    const response = await midasAPI("POST",'/db/lcom-gen',civil_com);
+    console.log(response);
+    }
+    if (type === "either") {
+      const concatenatedArray = joinedCombinations.flat(); 
+      console.log(concatenatedArray);
+      concatenatedArray.forEach((combArray, idx) => {
+        const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
+        const vCOMB = combArray.map((comb) => ({
+          "ANAL": "ST", // Assuming "RS" is the analysis type, you can replace it if needed
           "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
           "FACTOR": comb.sign * comb.factor // Assuming comb has properties `sign` and `factor`
         }));
@@ -833,13 +860,8 @@ function generateBasicCombinations(loadCombinations) {
       });
     console.log(civil_com);
     }
-    if (type === "either") {
-      const concatenatedArray = joinedCombinations.flat(); 
-      console.log(concatenatedArray);
-    }
 }
   console.log(allFinalCombinations);
-  
   return allFinalCombinations;
 }
 function join_factor(finalCombinations_sign) {
@@ -1018,63 +1040,6 @@ flattenedAddObj.forEach(item => {
   result.push(combined); // Push the combined result into the result array
   commonArray_add.push(result); // Add the result array to the common array as a sub-array
 });
-
-    // flattenedAddObj.forEach(item => {
-    //   let result = [];
-    //   console.log("Processing addObj item:", item);
-    //   const combined = combineFactors(Array.isArray(item) ? item : [item]); 
-    //   result.push(combined); // Push the result into the result array
-    //   commonArray_Add.push(result); // Push the result array into the common array as a sub-array
-    // });
-//     const commonArray_Add = [];
-// if (Array.isArray(addObj)) {
-//   const addObjLength = addObj.length;
-//   for (let i = 0; i < addObjLength; i++) {
-//     const currentArray = addObj[i];
-//     if (Array.isArray(currentArray)) {
-//       // Create an object to hold the merged results
-//       let result = {};
-      
-//       // Check the length of the first item in currentArray to determine how many inner arrays to process
-//       const innerArrayLength = currentArray[0].length;
-
-//       // Loop through each index of the inner arrays
-//       for (let j = 0; j < innerArrayLength; j++) {
-//         // Create a new array to hold the joined factors for this index
-//         let joinedFactors = [];
-
-//         // Loop through each item in currentArray
-//         for (let k = 0; k < currentArray.length; k++) {
-//           const item = currentArray[k];
-
-//           // Process only if the item has a loadCaseName and factor
-//           if (item && item.loadCaseName && item.factor) {
-//             const key = `${item.loadCaseName}|${item.sign}`;
-//             if (!result[key]) {
-//               result[key] = {
-//                 loadCaseName: item.loadCaseName,
-//                 sign: item.sign,
-//                 factor: []
-//               };
-//             }
-            
-//             // Ensure the factor array exists for this index
-//             if (!result[key].factor[j]) {
-//               result[key].factor[j] = []; // Initialize if undefined
-//             }
-//             // Join the corresponding inner array from the item
-//             if (Array.isArray(item.factor[j])) {
-//               result[key].factor[j] = result[key].factor[j].concat(item.factor[j]);
-//             }
-//           }
-//         }
-//       }
-
-//       // Push the result for each processed outer array in addObj
-//       commonArray_Add.push(result);
-//     }
-//   }
-// }
 const commonArray_Add = [];
 if (Array.isArray(addObj)) {
   addObj.forEach(currentArray => {
@@ -1103,7 +1068,7 @@ if (Array.isArray(addObj)) {
 
             // Ensure the factor array exists for this index
             if (!result[key].factor[i]) {
-              result[key].factor[i] = []; // Initialize if undefined
+              result[key].factor[i] = undefined; // Initialize if undefined
             }
 
             // If the item contains factors, merge them
@@ -1157,29 +1122,29 @@ function join(factorCombinations) {
     const join = [];
     const { add, either } = combination; 
     const eitherJoin = [];
-   function getSingleFactor(factor, index) {
-      for (let i = 0; i <= 4; i++) {
-        if (factor.length > i && factor[i].length > index) {
-          const value = factor[i][index]; // Accessing factor[i][index]
-  
-          // If value is an array, recursively call getSingleFactor using the same index (i)
-          if (Array.isArray(value)) {
-            const nvalue = factor[i][i]
-            return getSingleFactor([nvalue], index); // Corrected to pass 'i' instead of 0
+   function getSingleFactor(factor, index,i) {
+    const value = factor[index][i];
+      if (Array.isArray(value)) {
+      for (let j = 0; j <= 4; j++) {
+        if (factor.length > j && factor[j].length > index) {
+            const nvalue = factor[index][j]
+            return getSingleFactor([nvalue], index,j); // Corrected to pass 'i' instead of 0
           }
-          return value; // Return the non-array value
         }
+      } else {
+        if (value != null &&  value != 0) {
+        return value;
+        } 
       }
     return undefined; // Return undefined if no valid factor is found
   }
-function extractFactorsFromObject(factorObj, index) {
+function extractFactorsFromObject(factorObj, index,i) {
   const extractedFactors = [];
   // Iterate through each key in factorObj
   for (const key in factorObj) {
     if (factorObj.hasOwnProperty(key)) {
       const { loadCaseName, sign, factor } = factorObj[key];
-      const factorValue = getSingleFactor(factor, index); // Get factor[0][index]
-      
+      const factorValue = getSingleFactor(factor, index,i); // Get factor[0][index]
       // Push the extracted values into the result array
       if (factorValue != undefined) {
       extractedFactors.push({ loadCaseName, sign, factor: factorValue });
@@ -1188,12 +1153,12 @@ function extractFactorsFromObject(factorObj, index) {
   }
   return extractedFactors; // Return all extracted factors from this object
 }
-function combineMatchingFactors(either, factorIndex) {
+function combineMatchingFactors(either, factorIndex,i) {
   const combinedResult = [];
   // Extract the single factor based on factorIndex from each array in 'either'
   const extractedFactors = either.map(arr => {
     return arr.flatMap(factorObj => {
-      return extractFactorsFromObject(factorObj, factorIndex); // Extract and return key-value pairs for the current factorIndex
+      return extractFactorsFromObject(factorObj, factorIndex,i); // Extract and return key-value pairs for the current factorIndex
     });
   });
 
@@ -1203,14 +1168,12 @@ function combineMatchingFactors(either, factorIndex) {
       combinedResult.push([...temp]); // Push a copy of the current combination
       return;
     }
-
     for (const item of arrays[index]) {
       temp.push(item); // Add item to the temporary combination
       generateCombinations(arrays, temp, index + 1); // Recurse to the next array
       temp.pop(); // Remove the item after the recursion
     }
   }
-
   generateCombinations(extractedFactors);
   return combinedResult;
 }
@@ -1219,7 +1182,8 @@ function combineMatchingFactors(either, factorIndex) {
 function combineLoadCases(either,add) {
   const allCombinations = [];
   for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
-    const factorCombinations = combineMatchingFactors(either, factorIndex); // Get factor combinations for the current index
+    for (let i = 0; i < 5; i++) {
+    const factorCombinations = combineMatchingFactors(either, factorIndex,i); // Get factor combinations for the current index
     // Iterate through each array in 'add' object
     console.log(factorCombinations);
     add.forEach(addArray => {
@@ -1250,7 +1214,7 @@ function combineLoadCases(either,add) {
           });
       }
   });
-    // allCombinations.push(...factorCombinations);
+   }   // allCombinations.push(...factorCombinations);
   }
   console.log(allCombinations);
   return allCombinations;
@@ -1290,8 +1254,6 @@ if (either.length === 0 && add.length > 0) {
                             // If factor is not an array, use it directly
                             factorValue = factor;
                         } // Get factor[factorIndex][index]
-
-                  // Push the extracted values (loadCaseName, sign, factorValue) into combinedResult
                   if (factorValue !== undefined && factorValue !== 0) {
                       const combinedResult = { loadCaseName, sign, factor: factorValue };
                       allCombinations.push(combinedResult); 
@@ -1310,7 +1272,7 @@ if (either.length === 0 && add.length > 0) {
   
 }
   console.log(joinArray);
-  return joinArray; // Return the array of all combined results
+  return joinArray; 
 }
 
 function permutation_sign(result11) {
@@ -1521,8 +1483,6 @@ function permutation_sign(result11) {
 function Generate_Load_Combination() {
   const basicCombinations = generateBasicCombinations(loadCombinations);
   console.log(basicCombinations);
-  const uniqueCombinations = [...new Set(basicCombinations)];
-  console.log(uniqueCombinations);
 }
 const toggleExcelReader = () => {
   fileInputRef.current.click();
@@ -1573,6 +1533,49 @@ useEffect(() => {
     setInputValue('');
   }
 }, [loadCombinations]);
+const handleLoadCaseBlur = (combinationIndex, loadCaseIndex, field, value) => {
+  const updatedCombinations = [...loadCombinations];
+  updatedCombinations[combinationIndex].loadCases[loadCaseIndex][field] = value;
+
+  // Check if we are editing the last loadCase and need to add a new one
+  if (
+    loadCaseIndex === updatedCombinations[combinationIndex].loadCases.length - 1 && 
+    value !== ''
+  ) {
+    updatedCombinations[combinationIndex].loadCases.push({
+      loadName: '',
+      sign: '',
+      factor1: '',
+      factor2: '',
+      factor3: '',
+      factor4: '',
+      factor5: ''
+    });
+  }
+
+  setLoadCombinations(updatedCombinations);
+};
+
+// Function to handle adding new empty loadCombination
+const handleAddLoadCombination = () => {
+  setLoadCombinations([
+    ...loadCombinations,
+    {
+      loadCombination: '',
+      active: '',
+      type: '',
+      loadCases: [{
+        loadName: '',
+        sign: '',
+        factor1: '',
+        factor2: '',
+        factor3: '',
+        factor4: '',
+        factor5: ''
+      }]
+    }
+  ]);
+};
 const handleFileChange = (event) => {
   const file = event.target.files[0];
   const reader = new FileReader();
@@ -1920,6 +1923,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
             ))}
           </div>
         )}
+        
       </div>
        {/* <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }} onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor1', e.currentTarget.textContent)}
   contentEditable
@@ -1958,6 +1962,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
         {loadCase[factorKey] !== undefined ? loadCase[factorKey] : " "}
       </div>
     ))}
+    
          <div>
       {/* {loadCombinations.map((loadCombination, combinationIndex) => (
         <div key={combinationIndex}>
