@@ -15,6 +15,7 @@ import { midasAPI } from "./Function/Common";
 import { VerifyUtil, VerifyDialog } from "@midasit-dev/moaui";
 import ExcelJS from 'exceljs';  
 import { saveAs } from 'file-saver';
+import { extractProtocolDomainPort } from '@midasit-dev/moaui/Authentication/VerifyUtil';
 
 function App() {
 const [selectedLoadCombinationIndex, setSelectedLoadCombinationIndex] = useState(-1);
@@ -1012,7 +1013,6 @@ function join_factor(finalCombinations_sign) {
       // Return the combined result for this item set
       return combinedResult;
     };
-
     // const commonArray_Add = [];
     const commonArray_Either = [];
     flattenedEitherArray.forEach(item => {
@@ -1026,7 +1026,6 @@ function join_factor(finalCombinations_sign) {
 
    flattenedAddObj.forEach(item => {
     let result = []; // Initialize a result array for each iteration
-
   console.log("Processing flattenedAddObj item:", item);
   const combined = combineFactors(Array.isArray(item) ? item : [item]); 
   
@@ -1068,7 +1067,6 @@ if (Array.isArray(addObj)) {
               mergeFactors(result[key].factor[i], item.factor[i]);
             }
             
-            // Handle case where item itself may contain multiple items
             if (Array.isArray(item)) {
               item.forEach(innerItem => {
                 if (innerItem && innerItem.loadCaseName && innerItem.factor) {
@@ -1108,127 +1106,155 @@ if (Array.isArray(addObj)) {
 
 function join(factorCombinations) {
   const joinArray = [];
-  const allFinalCombinations = [];
+  const extractedFactorsStore = {}; // To store extractedFactors for every factorIndex
 
   for (const combination of factorCombinations) {
     const join = [];
-    const { add, either } = combination; 
+    const { add, either } = combination;
     const eitherJoin = [];
 
     function getSingleFactor(factor, factorIndex, i) {
-      if (factor.length > factorIndex && factor[factorIndex].length > i) {
-        let value = factor[factorIndex][i]; 
-
-        if (Array.isArray(value)) {
-          const flattenedArray = value.flat(); 
-          if (flattenedArray.length > i) {
-            return flattenedArray[i]; // Return the ith element of the flattened array
-          }
+      if (factor.length > factorIndex) {
+        let value = factor[factorIndex];
+        if (!Array.isArray(value)) {
+          return value;
         }
-        if (value.length > 0 || value != 0)
-          return value; 
+        if (value.length > 1) {
+          const flattenedArray = value.flat();
+          value = flattenedArray[i];
+          return value;
+        }
       }
-      return undefined; 
+      return undefined;
     }
 
-    function extractFactorsFromObject(factorObj, factorIndex) {
+    function extractFactorsFromObject(factorObj, factorIndex, i) {
       const extractedFactors = [];
-      
-      // Iterate through each key in factorObj
       for (const key in factorObj) {
         if (factorObj.hasOwnProperty(key)) {
           const { loadCaseName, sign, factor } = factorObj[key];
-          let factorValue;
-          // Check if factor[factorIndex] is a value or an array
-          for (let i = 0; i < 5; i++) {
-          if (Array.isArray(factor[factorIndex])) {
-            // If it's an array, flatten it and get the i-th element
-            const flattenedArray = factor[factorIndex].flat();
-            factorValue = flattenedArray[i];
-          } else {
-            // If it's a value, assign it directly
-            factorValue = factor[factorIndex];
-          }
-          // If factorValue is not undefined, not 0, and has a length greater than 0, push to extractedFactors
-          if (factorValue !== undefined && factorValue !== 0 && factorValue.length > 0) {
+          const factorValue = getSingleFactor(factor, factorIndex, i); // Get factor[factorIndex][i]
+
+          if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
             extractedFactors.push({ loadCaseName, sign, factor: factorValue });
           }
         }
       }
+      if (!extractedFactorsStore[factorIndex]) {
+        extractedFactorsStore[factorIndex] = [];
       }
-      
-      return extractedFactors; // Return the array of extracted factors
+      extractedFactorsStore[factorIndex][i] = extractedFactors;
+      return extractedFactors;
     }
-    
-    function combineMatchingFactors(either, factorIndex) {
+
+    function combineMatchingFactors(either, factorIndex, i) {
       const combinedResult = [];
-      
-      // Iterate through i from 0 to 4
-    
-        // Map through 'either' and extract factors
-        const extractedFactors = either.map(arr => {
-          return arr.flatMap(factorObj => {
-            return extractFactorsFromObject(factorObj, factorIndex); // Extract factors for each i
-          });
+
+      const extractedFactors = either.map(arr => {
+        return arr.flatMap(factorObj => {
+          return extractFactorsFromObject(factorObj, factorIndex, i);
         });
-    
-        // Generate combinations from extracted factors
-        function generateCombinations(arrays, temp = [], index = 0) {
-          if (index === arrays.length) {
-            combinedResult.push([...temp]); // Push the current combination
-            return;
-          }
-    
-          for (const item of arrays[index]) {
-            temp.push(item); // Add the item to the temporary combination
-            generateCombinations(arrays, temp, index + 1); // Recurse to the next array
-            temp.pop(); // Remove the item after recursion
-          }
-        
+      });
+      if (!extractedFactorsStore[factorIndex]) {
+        extractedFactorsStore[factorIndex] = [];
+      }
+      extractedFactorsStore[factorIndex][i] = extractedFactors;
+
+      function generateCombinations(arrays, temp = [], index = 0) {
+        const filteredArrays = arrays.filter(array => Array.isArray(array) && array.length > 0);
+        if (index === filteredArrays.length) {
+          combinedResult.push([...temp]);
+          return;
         }
-        // Generate combinations for the current set of extracted factors
-        generateCombinations(extractedFactors);
-      
-      
-      return combinedResult; // Return all generated combinations
+        for (const item of arrays[index]) {
+          temp.push(item);
+          generateCombinations(arrays, temp, index + 1);
+          temp.pop();
+        }
+      }
+      generateCombinations(extractedFactors);
+      return combinedResult;
     }
 
     function combineLoadCases(either, add) {
       const allCombinations = [];
-
+    
+      // Step 1: Loop through each factor and i
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
-        let factorCombinations = combineMatchingFactors(either, factorIndex);
-        add.forEach(addArray => {
-          if (Array.isArray(addArray) && addArray.length > 0) {
-            factorCombinations.forEach(factorCombination => {
-              const combinedResult = [...factorCombination];
-              addArray.forEach(item => {
-                Object.keys(item).forEach(key => {
-                  const { [key]: value } = item;
-                  const loadCaseName = value.loadCaseName;
-                  const sign = value.sign;
-                  let factorValue;
-
-                  if (Array.isArray(value.factor[factorIndex])) {
-                    factorValue = getSingleFactor(value.factor, factorIndex, i);
-                  } else {
-                    factorValue = value.factor[factorIndex];
-                  }
-
-                  if (factorValue !== undefined && factorValue !== null && factorValue !== 0) {
-                    combinedResult.push({ loadCaseName, sign, factor: factorValue });
-                  }
+        for (let i = 0; i < 5; i++) {
+          const factorCombinations = combineMatchingFactors(either, factorIndex, i);
+          console.log(factorCombinations);
+    
+          // Step 2: Iterate through the 'add' arrays
+          add.forEach(addArray => {
+            if (Array.isArray(addArray) && addArray.length > 0) {
+              factorCombinations.forEach(factorCombination => {
+                const combinedResult = [...factorCombination];
+    
+                addArray.forEach(item => {
+                  Object.keys(item).forEach(key => {
+                    const value = item[key];
+                    const loadCaseName = value.loadCaseName;
+                    const sign = value.sign;
+                    const factor = value.factor;
+                    const factorValue = getSingleFactor(factor, factorIndex, i);
+                    
+                    if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
+                      combinedResult.push({ loadCaseName, sign, factor: factorValue });
+                    }
+                  });
                 });
+    
+                if (combinedResult.length > 0) {
+                  allCombinations.push(combinedResult);
+                }
               });
-              allCombinations.push(combinedResult);
-            });
-          }
-        });
+            }
+          });
+        }
       }
+    
+      console.log('Extracted Factors:', extractedFactorsStore);
+      console.log('All Combinations:', allCombinations);
+    
+      // Step 3: Merge arrays from 'extractedFactorsStore'
+      let mergearray = [];
+// let extractedFactorsStore = {
+//   0: [[Array(4), Array(2), Array(2)], [Array(4), Array(2), Array(2)], [Array(4), Array(2), Array(2)], [Array(0), Array(0), Array(0)], [Array(0), Array(0), Array(0)]],
+//   1: [[Array(4), Array(0), Array(0)], [Array(4), Array(0), Array(0)], [Array(4), Array(0), Array(0)], [Array(0), Array(0), Array(0)], [Array(0), Array(0), Array(0)]]
+//   // More indices can be added similarly
+// };
 
+// Iterate through each index in the extractedFactorsStore
+// for (let index in extractedFactorsStore) {
+//   const arrayAtIndex = extractedFactorsStore[index]; // Get the array at the current index
+
+//   // Loop over the elements of the array at this index
+//   arrayAtIndex.forEach((subarray, innerIndex) => {
+//     let mergedInnerArray = [];
+
+//     // Go through each subarray and select one array from each (from the same position)
+//     for (let i = 0; i < subarray.length; i++) {
+//       const innerArray = extractedFactorsStore[index][i][innerIndex]; // Select from the same subarray position
+//       if (Array.isArray(innerArray) && innerArray.length > 0) {
+//         mergedInnerArray = [...mergedInnerArray, ...innerArray]; // Merge inner arrays
+//       }
+//     }
+
+//     // If mergedInnerArray has content, push it to mergearray
+//     if (mergedInnerArray.length > 0) {
+//       mergearray.push(mergedInnerArray);
+//     }
+//   });
+// }
+
+// console.log(mergearray);
+//       mergearray.forEach(mergedCombo => {
+//         generateCombination(mergedCombo);
+//       });
       return allCombinations;
     }
-
+    
     if (either && either.length > 0) {
       const combined = combineLoadCases(either, add);
       eitherJoin.push(...combined);
@@ -1238,40 +1264,43 @@ function join(factorCombinations) {
     const addJoin = [];
     if (either.length === 0 && add.length > 0) {
       const combined = [];
+
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
-        const allCombinations = [];
-        add.forEach(addArray => {
-          if (Array.isArray(addArray) && addArray.length > 0) {
-            addArray.forEach(item => {
-              Object.keys(item).forEach(key => {
-                const value = item[key];
-                const loadCaseName = value.loadCaseName;
-                const sign = value.sign;
-                let factorValue;
+        for (let i = 0; i < 5; i++) {
+          const allCombinations = [];
 
-                if (Array.isArray(value.factor[factorIndex])) {
-                  factorValue = getSingleFactor(value.factor, factorIndex, i);
-                } else {
-                  factorValue = value.factor[factorIndex];
-                }
-
-                if (factorValue !== undefined && factorValue !== 0) {
-                  allCombinations.push({ loadCaseName, sign, factor: factorValue });
-                }
+          add.forEach(addArray => {
+            if (Array.isArray(addArray) && addArray.length > 0) {
+              addArray.forEach(item => {
+                Object.keys(item).forEach(key => {
+                  const value = item[key];
+                  const loadCaseName = value.loadCaseName;
+                  const sign = value.sign;
+                  const factor = value.factor[factorIndex];
+                  let factorValue;
+                  if (Array.isArray(factor)) {
+                    factorValue = getSingleFactor(factor, factorIndex, i);
+                  } else {
+                    factorValue = factor;
+                  }
+                  if (factorValue !== undefined && factorValue !== 0) {
+                    const combinedResult = { loadCaseName, sign, factor: factorValue };
+                    allCombinations.push(combinedResult);
+                  }
+                });
               });
-            });
+            }
+          });
+          if (allCombinations.length > 0) {
+            combined.push(allCombinations);
           }
-        });
-
-        if (allCombinations.length > 0) {
-          combined.push(allCombinations);
         }
       }
       addJoin.push(...combined);
       joinArray.push(addJoin);
     }
   }
-
+  console.log("Extracted Factors Store: ", extractedFactorsStore);
   return joinArray;
 }
 
