@@ -865,7 +865,7 @@ async function generateBasicCombinations(loadCombinations) {
   console.log(allFinalCombinations);
   return allFinalCombinations;
 }
-function join_factor(finalCombinations_sign) {
+function join_factor(finalCombinations_sign ) {
   // Helper function to recursively flatten nested arrays
   const deepFlatten = (arr) => {
     if (Array.isArray(arr)) {
@@ -1106,13 +1106,13 @@ if (Array.isArray(addObj)) {
 
 function join(factorCombinations) {
   const joinArray = [];
-  const extractedFactorsStore = {}; // To store extractedFactors for every factorIndex
-
+  const extractedFactorsStore = {};
   for (const combination of factorCombinations) {
     const join = [];
     const { add, either } = combination;
     const eitherJoin = [];
-
+    console.log(either);
+    console.log(add);
     function getSingleFactor(factor, factorIndex, i) {
       if (factor.length > factorIndex) {
         let value = factor[factorIndex];
@@ -1127,14 +1127,12 @@ function join(factorCombinations) {
       }
       return undefined;
     }
-
     function extractFactorsFromObject(factorObj, factorIndex, i) {
       const extractedFactors = [];
       for (const key in factorObj) {
         if (factorObj.hasOwnProperty(key)) {
           const { loadCaseName, sign, factor } = factorObj[key];
-          const factorValue = getSingleFactor(factor, factorIndex, i); // Get factor[factorIndex][i]
-
+          const factorValue = getSingleFactor(factor, factorIndex, i); 
           if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
             extractedFactors.push({ loadCaseName, sign, factor: factorValue });
           }
@@ -1146,10 +1144,8 @@ function join(factorCombinations) {
       extractedFactorsStore[factorIndex][i] = extractedFactors;
       return extractedFactors;
     }
-
     function combineMatchingFactors(either, factorIndex, i) {
       const combinedResult = [];
-
       const extractedFactors = either.map(arr => {
         return arr.flatMap(factorObj => {
           return extractFactorsFromObject(factorObj, factorIndex, i);
@@ -1159,7 +1155,6 @@ function join(factorCombinations) {
         extractedFactorsStore[factorIndex] = [];
       }
       extractedFactorsStore[factorIndex][i] = extractedFactors;
-
       function generateCombinations(arrays, temp = [], index = 0) {
         const filteredArrays = arrays.filter(array => Array.isArray(array) && array.length > 0);
         if (index === filteredArrays.length) {
@@ -1175,22 +1170,21 @@ function join(factorCombinations) {
       generateCombinations(extractedFactors);
       return combinedResult;
     }
-
     function combineLoadCases(either, add) {
       const allCombinations = [];
-    
+      const addmulti = []
       // Step 1: Loop through each factor and i
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
         for (let i = 0; i < 5; i++) {
           const factorCombinations = combineMatchingFactors(either, factorIndex, i);
           console.log(factorCombinations);
-    
+       
           // Step 2: Iterate through the 'add' arrays
           add.forEach(addArray => {
             if (Array.isArray(addArray) && addArray.length > 0) {
               factorCombinations.forEach(factorCombination => {
                 const combinedResult = [...factorCombination];
-    
+                const addresult = [];
                 addArray.forEach(item => {
                   Object.keys(item).forEach(key => {
                     const value = item[key];
@@ -1204,7 +1198,6 @@ function join(factorCombinations) {
                     }
                   });
                 });
-    
                 if (combinedResult.length > 0) {
                   allCombinations.push(combinedResult);
                 }
@@ -1217,44 +1210,136 @@ function join(factorCombinations) {
       console.log('Extracted Factors:', extractedFactorsStore);
       console.log('All Combinations:', allCombinations);
     
-      // Step 3: Merge arrays from 'extractedFactorsStore'
       let mergearray = [];
-// let extractedFactorsStore = {
-//   0: [[Array(4), Array(2), Array(2)], [Array(4), Array(2), Array(2)], [Array(4), Array(2), Array(2)], [Array(0), Array(0), Array(0)], [Array(0), Array(0), Array(0)]],
-//   1: [[Array(4), Array(0), Array(0)], [Array(4), Array(0), Array(0)], [Array(4), Array(0), Array(0)], [Array(0), Array(0), Array(0)], [Array(0), Array(0), Array(0)]]
-//   // More indices can be added similarly
-// };
 
-// Iterate through each index in the extractedFactorsStore
-// for (let index in extractedFactorsStore) {
-//   const arrayAtIndex = extractedFactorsStore[index]; // Get the array at the current index
+      // Convert object to an array of values for easier indexing
+      const extractedValues = Object.values(extractedFactorsStore);
+      
+      // Loop through outer arrays (i)
+      for (let i = 0; i < extractedValues.length; i++) {
+        const currentArray = extractedValues[i]; // Get the i-th array
+      
+        // Loop through inner arrays (j)
+        for (let j = 0; j < currentArray.length; j++) {
+          const baseInnerArray = currentArray[j]; // Base [i][j] array to start replacements
+      
+          // Now loop through all future i+1, i+2, etc., to replace k values
+          for (let nextIndex = i + 1; nextIndex < extractedValues.length; nextIndex++) {
+            const nextArray = extractedValues[nextIndex]; // Get next (i+1), (i+2), etc.
+            const nextInnerArray = nextArray[j]; // Get the [i+1][j] inner array to replace values
+            
+            let mergedInnerArray = [...baseInnerArray]; // Start with a copy of the base array
+      
+            // Replace k values in the merged array with values from nextInnerArray[k]
+            for (let k = 0; k < baseInnerArray.length; k++) {
+              mergedInnerArray[k] = nextInnerArray[k];
+              // Push the modified array to mergearray
+              if (mergedInnerArray.length > 0 && !mergedInnerArray.some(arr => arr.length === 0)) {
+                mergearray.push([...mergedInnerArray]);
+              }
+            }
+          }
+        }
+      }
+      function generateCombinations(arrays, tempResult = [], index = 0, finalCombinations = []) {
+        // Base case: If we've processed all arrays, push the combination to finalCombinations
+        if (index === arrays.length) {
+          finalCombinations.push([...tempResult]);  // Add a copy of the current combination
+          return;
+        }
+      
+        // Loop through each item in the current array at 'index'
+        for (const item of arrays[index]) {
+          tempResult.push(item);  // Add the item to the current combination
+          generateCombinations(arrays, tempResult, index + 1, finalCombinations);  // Recursively process the next array
+          tempResult.pop();  // Backtrack: remove the last item before the next iteration
+        }
+        
+        return finalCombinations;  // Return all combinations generated
+      }
+      
+      console.log(mergearray);
+      let combinedResult  = [];
+      let finalCombinations = [];
+      for (const array of mergearray) {
+        let combinations = [];
+        combinations = generateCombinations(array);  // Generate all combinations for each array
+        finalCombinations.push(combinations);
+      }
+      console.log(finalCombinations);
+      let addresult = {};  // Use an object to store results by factorIndex and i
 
-//   // Loop over the elements of the array at this index
-//   arrayAtIndex.forEach((subarray, innerIndex) => {
-//     let mergedInnerArray = [];
-
-//     // Go through each subarray and select one array from each (from the same position)
-//     for (let i = 0; i < subarray.length; i++) {
-//       const innerArray = extractedFactorsStore[index][i][innerIndex]; // Select from the same subarray position
-//       if (Array.isArray(innerArray) && innerArray.length > 0) {
-//         mergedInnerArray = [...mergedInnerArray, ...innerArray]; // Merge inner arrays
-//       }
-//     }
-
-//     // If mergedInnerArray has content, push it to mergearray
-//     if (mergedInnerArray.length > 0) {
-//       mergearray.push(mergedInnerArray);
-//     }
-//   });
-// }
-
-// console.log(mergearray);
-//       mergearray.forEach(mergedCombo => {
-//         generateCombination(mergedCombo);
-//       });
-      return allCombinations;
+for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
+  for (let i = 0; i < 5; i++) {
+    // Initialize a place to store results for this factorIndex and i
+    if (!addresult[factorIndex]) {
+      addresult[factorIndex] = {};
     }
     
+    // This will store the addmultiResult for the current factorIndex and i
+    addresult[factorIndex][i] = [];
+    
+    // Iterate over add array
+    add.forEach(addArray => {
+      if (Array.isArray(addArray) && addArray.length > 0) {
+        let addmultiResult = [];  // To store the combination for this addArray, factorIndex, and i
+        
+        // Loop over each item in the addArray
+        addArray.forEach(item => {
+          Object.keys(item).forEach(key => {
+            const value = item[key];
+            const loadCaseName = value.loadCaseName;
+            const sign = value.sign;
+            const factor = value.factor;
+            
+            // Get the factor value using the function
+            const factorValue = getSingleFactor(factor, factorIndex, i);
+            
+            // Check if the factorValue is valid
+            if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
+              addmultiResult.push({ loadCaseName, sign, factor: factorValue });
+            }
+          });
+        });
+        
+        // Only push the result if there are items in addmultiResult
+        if (addmultiResult.length > 0) {
+          addresult[factorIndex][i].push(addmultiResult);  // Store result for the current factorIndex and i
+        }
+      }
+    });
+  }
+}
+
+console.log(addresult);
+let allCombinations_multi = []; // To store the final results
+
+// Loop through factorIndex and i in addresult
+for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
+  for (let i = 0; i < 5; i++) {
+    
+    // Access the addmultiResult for the current factorIndex and i
+    const currentAddResults = addresult[factorIndex]?.[i] || [];
+    
+    // Loop through each combination in finalCombinations
+    finalCombinations.forEach(finalCombinationArray => {
+      // For each result in the currentAddResults, merge with finalCombination
+      currentAddResults.forEach(addmultiResult => {
+        finalCombinationArray.forEach(finalCombination => {
+          const combinedResult = [...finalCombination]; // Copy the current combination
+          // Now add each item from addmultiResult to the combinedResult
+          addmultiResult.forEach(addItem => {
+            combinedResult.push(addItem); // Merge the add result
+          });
+          allCombinations_multi.push(combinedResult);
+        });
+      });
+    });
+  }
+}
+console.log(allCombinations_multi);
+  return allCombinations;
+}
     if (either && either.length > 0) {
       const combined = combineLoadCases(either, add);
       eitherJoin.push(...combined);
