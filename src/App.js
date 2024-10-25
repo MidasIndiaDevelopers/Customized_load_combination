@@ -1214,56 +1214,58 @@ function join(factorCombinations) {
 
       // Convert object to an array of values for easier indexing
       const extractedValues = Object.values(extractedFactorsStore);
-      
-      // Loop through outer arrays (i)
-      for (let i = 0; i < extractedValues.length; i++) {
-        const currentArray = extractedValues[i]; // Get the i-th array
-      
-        // Loop through inner arrays (j)
-        for (let j = 0; j < currentArray.length; j++) {
-          const baseInnerArray = currentArray[j]; // Base [i][j] array to start replacements
-      
-          // Now loop through all future i+1, i+2, etc., to replace k values
-          for (let nextIndex = i + 1; nextIndex < extractedValues.length; nextIndex++) {
-            const nextArray = extractedValues[nextIndex]; // Get next (i+1), (i+2), etc.
-            const nextInnerArray = nextArray[j]; // Get the [i+1][j] inner array to replace values
+
+      // Loop through the outer array (nextIndex) from the second element onward
+      for (let nextIndex = 1; nextIndex < extractedValues.length; nextIndex++) {
+        const nextArray = extractedValues[nextIndex]; // Get the next array at index nextIndex
+        // Intermediate array to store results for each nextIndex iteration
+        let iterationArray = [];
+        // Loop through inner arrays (j) within nextArray
+        for (let j = 0; j < nextArray.length; j++) {
+          // Blank mergedInnerArray at the start of each nextIndex iteration
+          let mergedInnerArray = []; 
+          // Loop through each baseInnerArray in the previous arrays up to nextIndex
+          for (let i = 0; i < nextIndex; i++) {
+            const currentArray = extractedValues[i]; // Get the current array up to nextIndex
+            const baseInnerArray = currentArray[j]; // Base array for replacement at position j
             
-            let mergedInnerArray = [...baseInnerArray]; // Start with a copy of the base array
+            // Replace values in mergedInnerArray using baseInnerArray and nextArray[j]
+            mergedInnerArray = [...baseInnerArray]; // Start fresh with base array values
       
-            // Replace k values in the merged array with values from nextInnerArray[k]
-            for (let k = 0; k < baseInnerArray.length; k++) {
-              mergedInnerArray[k] = nextInnerArray[k];
-              // Push the modified array to mergearray
+            // Replace elements in mergedInnerArray with those from nextArray[j]
+            for (let k = 0; k < mergedInnerArray.length; k++) {
+              mergedInnerArray[k] = nextArray[j][k];
               if (mergedInnerArray.length > 0 && !mergedInnerArray.some(arr => arr.length === 0)) {
-                mergearray.push([...mergedInnerArray]);
+                iterationArray.push([...mergedInnerArray]);
               }
             }
           }
         }
+        // After finishing each nextIndex loop, push the completed iterationArray to mergearray
+        if (iterationArray.length > 0) {
+          mergearray.push([...iterationArray]);
+        }
       }
+      console.log(mergearray);
       function generateCombinations(arrays, tempResult = [], index = 0, finalCombinations = []) {
         // Base case: If we've processed all arrays, push the combination to finalCombinations
         if (index === arrays.length) {
-          finalCombinations.push([...tempResult]);  // Add a copy of the current combination
+          finalCombinations.push([...tempResult]);
           return;
         }
-      
         // Loop through each item in the current array at 'index'
         for (const item of arrays[index]) {
           tempResult.push(item);  // Add the item to the current combination
           generateCombinations(arrays, tempResult, index + 1, finalCombinations);  // Recursively process the next array
           tempResult.pop();  // Backtrack: remove the last item before the next iteration
         }
-        
         return finalCombinations;  // Return all combinations generated
       }
-      
-      console.log(mergearray);
       let combinedResult  = [];
       let finalCombinations = [];
       for (const array of mergearray) {
         let combinations = [];
-        combinations = generateCombinations(array);  // Generate all combinations for each array
+        combinations = generateCombinations(array);
         finalCombinations.push(combinations);
       }
       console.log(finalCombinations);
