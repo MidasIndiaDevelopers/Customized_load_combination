@@ -27,6 +27,8 @@ const [loadCaseDropdownIndex, setLoadCaseDropdownIndex] = useState(-1);
 const [signDropdownIndex, setSignDropdownIndex] = useState(null);
 const [editingFactor, setEditingFactor] = useState({ index: null, factor: null });
 const [selectedDropListValue, setSelectedDropListValue] = useState(1);
+const [isAddingLoadCase, setIsAddingLoadCase] = useState(false);
+const addLoadCaseTimeout = useRef(null);
 let loadNames = [];
 
   const toggleLoadCaseDropdown = (index) => {
@@ -99,7 +101,7 @@ let loadNames = [];
     "Shrinkage Secondary",
   ];
   
- async function Import_Load_Cases() {
+  (async function Import_Load_Cases() {
     const stct = await midasAPI("GET", "/db/stct");
     const stldData = await midasAPI("GET", "/db/stld");
     const smlc = await midasAPI("GET", "/db/smlc");
@@ -140,8 +142,7 @@ let loadNames = [];
       for (const key in smlc.SMLC) {
         const item = smlc.SMLC[key];
         if (item.NAME) {
-          const smlcName = item.NAME;
-          loadNames.push(smlcName);
+          loadNames.push(item.NAME);
         }
       }
     }
@@ -216,14 +217,14 @@ let loadNames = [];
       for (const key in splc.SPLC) {
         const item = splc.SPLC[key];
         if (item.NAME) {
-          const spName = item.NAME;
-          loadNames.push(spName);
+          loadNames.push(item.NAME);
         }
       }
     }
   
-    console.log(loadNames);
-  };
+    console.log(loadNames); // Log loadNames after all API calls are complete
+  })();
+  console.log(loadNames);
 
 function importLoadCombinationInput(data) {
   setLoadCombinations(data);
@@ -233,22 +234,33 @@ function importLoadCombinationInput(data) {
   };
   console.log(selectedDropListValue);
   const exportToExcel = () => {
+    console.log(loadNames);
     // Create a new workbook
     const workbook = new ExcelJS.Workbook();
 
     // Add a new worksheet to the workbook
     const worksheet = workbook.addWorksheet('Load Combinations');
+    // Add headers to the first row
+  worksheet.getCell('A1').value = 'Name';
+  worksheet.getCell('B1').value = 'Active';
+  worksheet.getCell('C1').value = 'Type';
+
+  // Write loadNames in the first row starting from the 4th column
+  loadNames.forEach((name, index) => {
+    const columnLetter = String.fromCharCode(68 + index); // 'D' is ASCII 68
+    worksheet.getCell(`${columnLetter}1`).value = name;
+  });
 
     // Optional: Add headers to the worksheet
-    worksheet.columns = [
-      { header: 'Load Case', key: 'load_case', width: 30 },
-      { header: 'Factor 1', key: 'factor1', width: 15 },
-      { header: 'Factor 2', key: 'factor2', width: 15 }
-    ];
+    // worksheet.columns = [
+    //   { header: 'Load Case', key: 'load_case', width: 30 },
+    //   { header: 'Factor 1', key: 'factor1', width: 15 },
+    //   { header: 'Factor 2', key: 'factor2', width: 15 }
+    // ];
 
-    // Example rows (you can replace this with dynamic data)
-    worksheet.addRow({ load_case: 'Case 1', factor1: 1.5, factor2: 0.9 });
-    worksheet.addRow({ load_case: 'Case 2', factor1: 1.2, factor2: 1.0 });
+    // // Example rows (you can replace this with dynamic data)
+    // worksheet.addRow({ load_case: 'Case 1', factor1: 1.5, factor2: 0.9 });
+    // worksheet.addRow({ load_case: 'Case 2', factor1: 1.2, factor2: 1.0 });
 
     // Write the workbook to a buffer and save it as an Excel file
     workbook.xlsx.writeBuffer().then((buffer) => {
@@ -897,7 +909,7 @@ function join_factor(finalCombinations_sign ) {
         } else {
           // At the deepest level, copy non-undefined values from the source
           if (source[i] !== undefined) {
-            target[i] = source[i] === undefined ? undefined : (source[i] === null || source[i] === '' ? undefined : source[i]);
+            target[i] = source[i] !== undefined ? source[i] : target[i];
           }
         }
       }
@@ -1095,6 +1107,46 @@ if (Array.isArray(addObj)) {
 
     console.log("Final Common Array of Results: Add", commonArray_add);
     console.log("Final Common Array of Results: Either", commonArray_Either);
+    const normalizeFactors = (factorArray) => {
+      // If factorArray is not an array, return it as is
+      if (!Array.isArray(factorArray)) return factorArray;
+    
+      // Process each element within factorArray
+      return factorArray.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          // Get the maximum key present in the object
+          const maxKey = Math.max(...Object.keys(item).map(Number));
+    
+          // Iterate over all keys from 0 to maxKey and ensure each one exists
+          for (let index = 0; index <= maxKey; index++) {
+            if (!(index in item)) {
+              item[index] = undefined; // Add missing key with value `undefined`
+            }
+          }
+    
+          return item;
+        } else {
+          return item === "empty" ? undefined : item;
+        }
+      });
+    };
+    
+    const processFactorsArray = (commonArray) => {
+      commonArray.forEach(itemArray => {
+        itemArray.forEach(subArray => {
+          Object.keys(subArray).forEach(key => {
+            const factor = subArray[key].factor;
+            if (Array.isArray(factor)) {
+              subArray[key].factor = normalizeFactors(factor);
+            }
+          });
+        });
+      });
+    };
+    processFactorsArray(commonArray_add);
+processFactorsArray(commonArray_Either);
+console.log(commonArray_Add);
+console.log(commonArray_Either);
     return {
       add: commonArray_add,
       either: commonArray_Either
@@ -1170,15 +1222,49 @@ function join(factorCombinations) {
       generateCombinations(extractedFactors);
       return combinedResult;
     }
+    function getMaxIValue(either) {
+      let maxIValue = 5;  
+    
+      either.forEach(arr => {
+        arr.forEach(item => {
+          Object.keys(item).forEach(key => {
+            const subItem = item[key];
+            if (subItem && subItem.factor && Array.isArray(subItem.factor)) {
+              const factorDepth = getArrayDepth(subItem.factor);
+              maxIValue = Math.max(maxIValue, Math.pow(5, factorDepth - 1));
+            }
+          });
+        });
+      });
+    
+      return maxIValue;
+    }
+    
+    // Helper function to determine array depth
+    function getArrayDepth(array) {
+      let depth = 1;
+      let current = array;
+      while (Array.isArray(current[0])) {
+        depth += 1;
+        current = current[0];
+      }
+      return depth;
+    }
+ 
+    const maxI = getMaxIValue(either, add);
+    console.log('Max i value based on dimensionality:', maxI);
+    
     function combineLoadCases(either, add) {
       const allCombinations = [];
-      const addmulti = []
+      const addmulti = [];
       // Step 1: Loop through each factor and i
+      const factorLimit = either.length;
+      const maxI = getMaxIValue(either, add);
+      console.log(maxI);
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < maxI; i++) {
           const factorCombinations = combineMatchingFactors(either, factorIndex, i);
           console.log(factorCombinations);
-       
           // Step 2: Iterate through the 'add' arrays
           add.forEach(addArray => {
             if (Array.isArray(addArray) && addArray.length > 0) {
@@ -1206,69 +1292,122 @@ function join(factorCombinations) {
           });
         }
       }
-    
       console.log('Extracted Factors:', extractedFactorsStore);
       console.log('All Combinations:', allCombinations);
-    
-      let mergearray = [];
-
+      // let mergearray = [];
       // Convert object to an array of values for easier indexing
       const extractedValues = Object.values(extractedFactorsStore);
+// console.log(mergeArray);
+const mergeArray = [];
+// Helper function to generate permutations
+function getCustomCombinations(arrays) {
+  const result = [];
 
-      // Loop through the outer array (nextIndex) from the second element onward
-      for (let nextIndex = 1; nextIndex < extractedValues.length; nextIndex++) {
-        const nextArray = extractedValues[nextIndex]; // Get the next array at index nextIndex
-        // Intermediate array to store results for each nextIndex iteration
-        let iterationArray = [];
-        // Loop through inner arrays (j) within nextArray
-        for (let j = 0; j < nextArray.length; j++) {
-          // Blank mergedInnerArray at the start of each nextIndex iteration
-          let mergedInnerArray = []; 
-          // Loop through each baseInnerArray in the previous arrays up to nextIndex
-          for (let i = 0; i < nextIndex; i++) {
-            const currentArray = extractedValues[i]; // Get the current array up to nextIndex
-            const baseInnerArray = currentArray[j]; // Base array for replacement at position j
-            
-            // Replace values in mergedInnerArray using baseInnerArray and nextArray[j]
-            mergedInnerArray = [...baseInnerArray]; // Start fresh with base array values
-      
-            // Replace elements in mergedInnerArray with those from nextArray[j]
-            for (let k = 0; k < mergedInnerArray.length; k++) {
-              mergedInnerArray[k] = nextArray[j][k];
-              if (mergedInnerArray.length > 0 && !mergedInnerArray.some(arr => arr.length === 0)) {
-                iterationArray.push([...mergedInnerArray]);
-              }
-            }
-          }
+  function buildCombination(currentCombination, currentIndex) {
+    // Base case: if we've built a combination using elements from all non-empty arrays, add it to the result
+    if (currentIndex === arrays.length) {
+      result.push([...currentCombination]);
+      return;
+    }
+
+    // If the current array is empty, skip to the next one
+    if (arrays[currentIndex].length === 0) {
+      buildCombination(currentCombination, currentIndex + 1);
+      return;
+    }
+    if (currentIndex === 0) {
+      // Iterate over the first array
+      arrays[currentIndex].forEach((subArray, index) => {
+        if (arrays[currentIndex + 1].length > 0) {
+          // Pair the subArray from the current index with the opposite element in the next array
+          const nextSubArray = arrays[currentIndex + 1][arrays[currentIndex + 1].length - 1 - index];
+          currentCombination.push(subArray, nextSubArray); // Add both subarrays to the combination
+          buildCombination(currentCombination, currentIndex + 2); // Skip to the next index
+          currentCombination.pop(); // Backtrack to try the next combination
+          currentCombination.pop(); // Backtrack for the paired subarray
         }
-        // After finishing each nextIndex loop, push the completed iterationArray to mergearray
-        if (iterationArray.length > 0) {
-          mergearray.push([...iterationArray]);
-        }
+      });
+    }
+  }
+  // Start the recursive process with an empty combination and from the first index
+  buildCombination([], 0);
+
+  return result;
+}
+
+// Outer loop iterating over j
+for (let j = 0; j < 5; j++) {
+  let iterationArray = [];
+
+  // Nested loop over i, treating it as the primary fixed element array
+  for (let i = 0; i < 5; i++) {
+    const baseInnerArray = extractedValues[i][j]; // Array for the fixed element
+    const fixedElement = baseInnerArray[0]; // First element of i-th array for fixed position
+    // Initialize elementsToPermute with rest of elements in the current i-th array
+    let elementsToPermute = [baseInnerArray.slice(1)];
+    // Additional loop for other `i` values (0 to 4), except the current `i`
+    for (let k = 0; k < 5; k++) {
+      if (k === i) continue; // Skip the current i index to avoid repetition
+      const additionalArray = extractedValues[k][j];
+      if (additionalArray && additionalArray.length > 1) {
+        const nonEmptyElements = additionalArray.slice(1).filter(subArr => subArr.length > 0);
+        elementsToPermute.push(nonEmptyElements);
       }
-      console.log(mergearray);
+    }
+    // Generate permutations for elementsToPermute and merge with fixedElement
+    console.log(elementsToPermute);
+    const permutations = getCustomCombinations(elementsToPermute);
+    console.log(permutations);
+    permutations.forEach(perm => {
+      const mergedInnerArray = [fixedElement, ...perm];
+      if (mergedInnerArray.every(el => el && el.length > 0)) {
+        iterationArray.push(mergedInnerArray);
+      }
+    });
+  }
+  // Append iterationArray to mergeArray if it contains results
+  if (iterationArray.length > 0) {
+    mergeArray.push([...iterationArray]);
+  }
+}
+
+console.log(mergeArray);
       function generateCombinations(arrays, tempResult = [], index = 0, finalCombinations = []) {
         // Base case: If we've processed all arrays, push the combination to finalCombinations
         if (index === arrays.length) {
           finalCombinations.push([...tempResult]);
           return;
         }
-        // Loop through each item in the current array at 'index'
-        for (const item of arrays[index]) {
-          tempResult.push(item);  // Add the item to the current combination
-          generateCombinations(arrays, tempResult, index + 1, finalCombinations);  // Recursively process the next array
-          tempResult.pop();  // Backtrack: remove the last item before the next iteration
+      
+        // Debugging statement to check what arrays[index] contains
+        console.log("Current index:", index, "arrays[index]:", arrays[index]);
+      
+        // Check if arrays[index] is an array and is iterable
+        if (Array.isArray(arrays[index])) {
+          // Loop through each item in the current array at 'index'
+          for (const item of arrays[index]) {
+            tempResult.push(item);  // Add the item to the current combination
+            generateCombinations(arrays, tempResult, index + 1, finalCombinations);  // Recursively process the next array
+            tempResult.pop();  // Backtrack: remove the last item before the next iteration
+          }
+        } else {
+          console.error(`Expected an array at index ${index} but found:`, arrays[index]);
         }
+      
         return finalCombinations;  // Return all combinations generated
       }
       let combinedResult  = [];
-      let finalCombinations = [];
-      for (const array of mergearray) {
+      
+      for (const outerArray of mergeArray) {
+        let finalCombinations = [];
         let combinations = [];
-        combinations = generateCombinations(array);
-        finalCombinations.push(combinations);
+        for (let subArray of outerArray) {
+            combinations = generateCombinations(subArray);
+            finalCombinations.push(combinations);
+        }
+        combinedResult.push(finalCombinations);
       }
-      console.log(finalCombinations);
+      console.log(combinedResult);
       let addresult = {};  // Use an object to store results by factorIndex and i
 
 for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
@@ -1277,7 +1416,6 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
     if (!addresult[factorIndex]) {
       addresult[factorIndex] = {};
     }
-    
     // This will store the addmultiResult for the current factorIndex and i
     addresult[factorIndex][i] = [];
     
@@ -1316,31 +1454,49 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
 console.log(addresult);
 let allCombinations_multi = []; // To store the final results
 
-// Loop through factorIndex and i in addresult
-for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
-  for (let i = 0; i < 5; i++) {
-    
-    // Access the addmultiResult for the current factorIndex and i
-    const currentAddResults = addresult[factorIndex]?.[i] || [];
-    
-    // Loop through each combination in finalCombinations
-    finalCombinations.forEach(finalCombinationArray => {
-      // For each result in the currentAddResults, merge with finalCombination
-      currentAddResults.forEach(addmultiResult => {
-        finalCombinationArray.forEach(finalCombination => {
-          const combinedResult = [...finalCombination]; // Copy the current combination
-          // Now add each item from addmultiResult to the combinedResult
-          addmultiResult.forEach(addItem => {
-            combinedResult.push(addItem); // Merge the add result
-          });
-          allCombinations_multi.push(combinedResult);
+// Loop through each main array in combinedResult
+combinedResult.forEach((mainArray) => {
+  // Loop through each inner array in mainArray
+  mainArray.forEach((innerArray) => {
+    let combinedSet = []; // Array to store all combined arrays for this innerArray
+
+    // Loop through each key in the addResult object
+    Object.keys(addresult).forEach((key) => {
+      const addArray = addresult[key]; // Access the array or subarray using the key
+
+      // if (innerArray && Array.isArray(innerArray) && addArray && Array.isArray(addArray)) {
+        // Iterate through the subarrays at the same index
+        innerArray.forEach((subArray, index) => {
+          const correspondingAddSubArray = addArray[key]; // Get the matching subarray from addArray
+
+          // Only combine if both subarrays exist
+          if (subArray && correspondingAddSubArray) {
+            // Iterate through each subarray inside correspondingAddSubArray
+            correspondingAddSubArray.forEach((addSubArray) => {
+              // Merge the subArray from innerArray with each subarray from correspondingAddSubArray
+              const combinedArray = [
+                ...subArray, // Spread elements from the main subArray
+                ...addSubArray // Spread elements from the current addSubArray
+              ];
+              combinedSet.push(combinedArray); // Add the combined result to combinedSet
+            });
+          }
         });
-      });
+      // }
     });
-  }
-}
+    // Push the combined set for this innerArray into the main results array
+    allCombinations_multi.push(combinedSet);
+  });
+});
 console.log(allCombinations_multi);
-  return allCombinations;
+const flattenedCombinations = allCombinations_multi.flat(1);
+
+const joinedCombinations = [...flattenedCombinations, ...allCombinations];
+
+// Log the joined array
+console.log(joinedCombinations);
+
+  return joinedCombinations;
 }
     if (either && either.length > 0) {
       const combined = combineLoadCases(either, add);
@@ -1351,11 +1507,12 @@ console.log(allCombinations_multi);
     const addJoin = [];
     if (either.length === 0 && add.length > 0) {
       const combined = [];
-
+    
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
         for (let i = 0; i < 5; i++) {
           const allCombinations = [];
-
+          let shouldBreak = false; // Flag to determine whether to break the outer loop
+    
           add.forEach(addArray => {
             if (Array.isArray(addArray) && addArray.length > 0) {
               addArray.forEach(item => {
@@ -1365,11 +1522,24 @@ console.log(allCombinations_multi);
                   const sign = value.sign;
                   const factor = value.factor[factorIndex];
                   let factorValue;
+    
                   if (Array.isArray(factor)) {
                     factorValue = getSingleFactor(factor, factorIndex, i);
                   } else {
                     factorValue = factor;
+                    
+                    // Execute the code below after setting factorValue
+                    if (factorValue !== undefined && factorValue !== 0) {
+                      const combinedResult = { loadCaseName, sign, factor: factorValue };
+                      allCombinations.push(combinedResult);
+                      
+                      // Set the flag to true and break from the outer loop
+                      shouldBreak = true; 
+                      return; // Exit the innermost loop
+                    }
                   }
+    
+                  // Continue to push combinedResult for array factors
                   if (factorValue !== undefined && factorValue !== 0) {
                     const combinedResult = { loadCaseName, sign, factor: factorValue };
                     allCombinations.push(combinedResult);
@@ -1377,20 +1547,32 @@ console.log(allCombinations_multi);
                 });
               });
             }
+    
+            // Check the flag after processing addArray
+            if (shouldBreak) {
+              return; // Break out of the forEach loop as well
+            }
           });
+    
+          // Break the outer loop if the condition was me
           if (allCombinations.length > 0) {
             combined.push(allCombinations);
           }
+        if (shouldBreak) {
+          break; // Break out of the 'i' loop
         }
       }
+      }
+      
       addJoin.push(...combined);
       joinArray.push(addJoin);
     }
+    
+    
   }
   console.log("Extracted Factors Store: ", extractedFactorsStore);
   return joinArray;
 }
-
 
 function permutation_sign(result11) {
   const { addObj, eitherArray } = result11;
@@ -1598,6 +1780,10 @@ function permutation_sign(result11) {
   return { addObj, eitherArray };
 }
 function Generate_Load_Combination() {
+  const uniqueFactorData = removeDuplicateFactors(loadCombinations);
+  setLoadCombinations(uniqueFactorData);
+  console.log(uniqueFactorData);
+  console.log(loadCombinations);
   const basicCombinations = generateBasicCombinations(loadCombinations);
   console.log(basicCombinations);
 }
@@ -1650,49 +1836,43 @@ useEffect(() => {
     setInputValue('');
   }
 }, [loadCombinations]);
-const handleLoadCaseBlur = (combinationIndex, loadCaseIndex, field, value) => {
-  const updatedCombinations = [...loadCombinations];
-  updatedCombinations[combinationIndex].loadCases[loadCaseIndex][field] = value;
+const removeDuplicateFactors = (data) => {
+  return data.map((combination) => {
+    // Only process loadCases if type is "Either"
+    if (combination.type === "Either") {
+      const updatedLoadCases = combination.loadCases.map((loadCase) => {
+        const factors = [
+          loadCase.factor1,
+          loadCase.factor2,
+          loadCase.factor3,
+          loadCase.factor4,
+          loadCase.factor5,
+        ];
 
-  // Check if we are editing the last loadCase and need to add a new one
-  if (
-    loadCaseIndex === updatedCombinations[combinationIndex].loadCases.length - 1 && 
-    value !== ''
-  ) {
-    updatedCombinations[combinationIndex].loadCases.push({
-      loadName: '',
-      sign: '',
-      factor1: '',
-      factor2: '',
-      factor3: '',
-      factor4: '',
-      factor5: ''
-    });
-  }
+        // Remove duplicates by creating a Set, then convert back to an array
+        const uniqueFactors = Array.from(new Set(factors));
 
-  setLoadCombinations(updatedCombinations);
-};
+        // Map unique factors back to loadCase properties
+        return {
+          ...loadCase,
+          factor1: uniqueFactors[0] || undefined,
+          factor2: uniqueFactors[1] || undefined,
+          factor3: uniqueFactors[2] || undefined,
+          factor4: uniqueFactors[3] || undefined,
+          factor5: uniqueFactors[4] || undefined,
+        };
+      });
 
-// Function to handle adding new empty loadCombination
-const handleAddLoadCombination = () => {
-  setLoadCombinations([
-    ...loadCombinations,
-    {
-      loadCombination: '',
-      active: '',
-      type: '',
-      loadCases: [{
-        loadName: '',
-        sign: '',
-        factor1: '',
-        factor2: '',
-        factor3: '',
-        factor4: '',
-        factor5: ''
-      }]
+      return {
+        ...combination,
+        loadCases: updatedLoadCases,
+      };
     }
-  ]);
+    // Return the combination as-is if type is not "Either"
+    return combination;
+  });
 };
+
 const handleFileChange = (event) => {
   const file = event.target.files[0];
   const reader = new FileReader();
@@ -1703,9 +1883,7 @@ const handleFileChange = (event) => {
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-    console.log('Raw JSON Data:', jsonData); // Log raw JSON data
-
-    // Convert each row to an object and store in loadCombinations
+    console.log('Raw JSON Data:', jsonData); 
     const formattedData = [];
     let currentLoadCombination = null;
 
@@ -1723,7 +1901,6 @@ const handleFileChange = (event) => {
 
       if (loadCombination) {
         if (!currentLoadCombination || currentLoadCombination.loadCombination !== loadCombination) {
-          // Create a new loadCombination object
           currentLoadCombination = {
             loadCombination,
             active,
@@ -1732,8 +1909,6 @@ const handleFileChange = (event) => {
           };
           formattedData.push(currentLoadCombination);
         }
-
-        // Add the load case to loadCombination's loadCases array
         currentLoadCombination.loadCases.push({
           loadCaseName,
           sign,
@@ -1748,11 +1923,13 @@ const handleFileChange = (event) => {
 
     console.log('Formatted Data:', formattedData); 
     setLoadCombinations(formattedData);
+   
   };
 
   reader.readAsBinaryString(file);
 };
 console.log(loadCombinations);
+
 const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1); 
 
   const toggleDropdown = (index) => {
@@ -1761,7 +1938,8 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   const toggleTypeDropdown = (index) => {
     setTypeDropdownIndex(index === typeDropdownIndex ? null : index);
   };
-
+  
+  
   const handleOptionSelect = (index, option) => {
     handleLoadCombinationChange(index, 'active', option);
     setActiveDropdownIndex(null);
@@ -1779,7 +1957,6 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
       return updatedLoadCombinations;
     });
   };
-
   const debounce = (func, delay) => {
     let debounceTimer;
     return function (...args) {
@@ -1809,21 +1986,34 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   }, []);
   console.log(loadNames);
   console.log(loadCombinations);
-  const handleFactorChange = (combinationIndex, caseIndex, factorName, value) => {
-    const updatedLoadCombinations = [...loadCombinations];
-    updatedLoadCombinations[combinationIndex].loadCases[caseIndex][factorName] = value;
-    setLoadCombinations(updatedLoadCombinations);
-  };
-  const LoadCaseComponent = ({ loadCase, loadCaseIndex, updateLoadCase }) => {
-   
-    const handleFactorClick = (e) => {
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(e.currentTarget);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }};
+  const handleAddLoadCase = () => {
+    setIsAddingLoadCase((prevAdding) => {
+      if (prevAdding) return; 
+      addNewLoadCase(selectedLoadCombinationIndex);
+      setTimeout(() => {
+        setIsAddingLoadCase(false);
+      }, 500);
   
+      return true; 
+    });
+  };
+  
+  const addNewLoadCase = useCallback((combinationIndex) => {
+    const newLoadCase = {
+      loadCaseName: "", 
+      sign: "",
+      factor1: undefined,
+      factor2: undefined,
+      factor3: undefined,
+      factor4: undefined,
+      factor5: undefined
+    };
+    setLoadCombinations((prevCombinations) => {
+      const updatedCombinations = [...prevCombinations];
+      updatedCombinations[combinationIndex].loadCases.push(newLoadCase);
+      return updatedCombinations;
+    });
+  }, [setLoadCombinations]);
   
   //Main UI
   return (
@@ -2009,124 +2199,84 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
       borderTop: '2px solid #ccc',
       boxShadow: '0px -4px 5px -4px grey'
     }}>
-              <Scrollbars height={450} width={460}>
-  {selectedLoadCombinationIndex >= 0 && loadCombinations[selectedLoadCombinationIndex].loadCases.map((loadCase, loadCaseIndex) => (
-    <div key={loadCaseIndex} style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #ccc' }}>
-      <div style={{ flex: '0 0 132px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', position: 'relative' }} onClick={(e) => { e.stopPropagation(); toggleLoadCaseDropdown(loadCaseIndex); }}>
-        <Typography >
-          {loadCase.loadCaseName}
-        </Typography>
-        {loadCaseDropdownIndex === loadCaseIndex && (
-          <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
-            {loadNames.map((name, nameIndex) => (
-              <div key={nameIndex} onClick={() => handleLoadCaseOptionSelect(selectedLoadCombinationIndex, loadCaseIndex, name)} style={{ padding: '5px', cursor: 'pointer', backgroundColor: name === loadCase.loadCaseName ? '#f0f0f0' : 'white' }}>
-                <Typography>{name}</Typography>
-              </div>
-            ))}
+           <Scrollbars height={450} width={460}>
+  {selectedLoadCombinationIndex >= 0 &&
+    loadCombinations[selectedLoadCombinationIndex].loadCases.map((loadCase, loadCaseIndex) => (
+      <div key={loadCaseIndex} style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #ccc' }}>
+        <div
+          style={{ flex: '0 0 132px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', position: 'relative' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLoadCaseDropdown(loadCaseIndex);
+          }}
+        >
+          <Typography>{loadCase.loadCaseName}</Typography>
+          {loadCaseDropdownIndex === loadCaseIndex && (
+            <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
+              {loadNames.map((name, nameIndex) => (
+                <div
+                  key={nameIndex}
+                  onClick={() => handleLoadCaseOptionSelect(selectedLoadCombinationIndex, loadCaseIndex, name)}
+                  style={{ padding: '5px', cursor: 'pointer', backgroundColor: name === loadCase.loadCaseName ? '#f0f0f0' : 'white' }}
+                >
+                  <Typography>{name}</Typography>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Dynamic Sign Dropdown */}
+        <div
+          style={{ flex: '1 1 25px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', position: 'relative' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSignDropdown(loadCaseIndex);
+          }}
+        >
+          <Typography>{loadCase.sign}</Typography>
+          {signDropdownIndex === loadCaseIndex && (
+            <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
+              {['+', '-', '+,-', '±'].map((signOption, signIndex) => (
+                <div
+                  key={signIndex}
+                  onClick={() => handleSignOptionSelect(selectedLoadCombinationIndex, loadCaseIndex, signOption)}
+                  style={{ padding: '5px', cursor: 'pointer', backgroundColor: signOption === loadCase.sign ? '#f0f0f0' : 'white' }}
+                >
+                  <Typography>{signOption}</Typography>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {['factor1', 'factor2', 'factor3', 'factor4', 'factor5'].map((factorKey, factorIndex) => (
+          <div
+            key={factorIndex}
+            style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text', fontSize: '12px' }}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, factorKey, e.currentTarget.textContent)}
+          >
+            {loadCase[factorKey] !== undefined ? loadCase[factorKey] : " "}
           </div>
-        )}
-      </div>
-      {/* <div style={{ flex: '1 1 25px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}><Typography>{loadCase.sign}</Typography></div> */}
-      <div style={{ flex: '1 1 25px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', position: 'relative' }} onClick={(e) => { e.stopPropagation(); toggleSignDropdown(loadCaseIndex); }}> 
-        <Typography >
-          {loadCase.sign}
-        </Typography>
-        {signDropdownIndex === loadCaseIndex && (
-          <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
-            {['+', '-', '+,-', '±'].map((signOption, signIndex) => (
-              <div key={signIndex} onClick={() => handleSignOptionSelect(selectedLoadCombinationIndex, loadCaseIndex, signOption)} style={{ padding: '5px', cursor: 'pointer', backgroundColor: signOption === loadCase.sign ? '#f0f0f0' : 'white' }}>
-                <Typography>{signOption}</Typography>
-              </div>
-            ))}
-          </div>
-        )}
-        
-      </div>
-       {/* <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }} onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor1', e.currentTarget.textContent)}
-  contentEditable
-  suppressContentEditableWarning>
-        <Typography>{loadCase.factor1 !== undefined ? loadCase.factor1 : " "}</Typography>
-        </div>
-        <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }} onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor2', e.currentTarget.textContent)}
-  contentEditable
-  suppressContentEditableWarning>
-        <Typography>{loadCase.factor2 !== undefined ? loadCase.factor2 : " "}</Typography>
-        </div>
-        <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }}  onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor3', e.currentTarget.textContent)}
-  contentEditable
-  suppressContentEditableWarning>
-        <Typography>{loadCase.factor3 !== undefined ? loadCase.factor3 : " "}</Typography>
-        </div>
-        <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }}  onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor4', e.currentTarget.textContent)}
-  contentEditable
-  suppressContentEditableWarning>
-        <Typography>{loadCase.factor4 !== undefined ? loadCase.factor4 : " "}</Typography>
-        </div>
-        <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text' }}  onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, 'factor5', e.currentTarget.textContent)}
-  contentEditable
-  suppressContentEditableWarning>
-        <Typography>{loadCase.factor5 !== undefined ? loadCase.factor5 : " "}</Typography>
-        </div> */}
-        {/* Factor Fields */}
-    {['factor1', 'factor2', 'factor3', 'factor4', 'factor5'].map((factorKey, factorIndex) => (
-      <div
-        key={factorIndex}
-        style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'text', fontSize: '12px' }}
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={(e) => handleFactorBlur(selectedLoadCombinationIndex, loadCaseIndex, factorKey, e.currentTarget.textContent)}
-      >  
-        {loadCase[factorKey] !== undefined ? loadCase[factorKey] : " "}
+        ))}
       </div>
     ))}
-    
-         <div>
-      {/* {loadCombinations.map((loadCombination, combinationIndex) => (
-        <div key={combinationIndex}>
-          <h3>{loadCombination.active}</h3>
-          {loadCombination.loadCases.map((loadCase, loadCaseIndex) => (
-            <FactorInput
-              key={loadCaseIndex}
-              combinationIndex={combinationIndex}
-              loadCase={loadCase}
-              loadCaseIndex={loadCaseIndex}
-              handleFactorChange={handleFactorChange}
-            />
-          ))}
-        </div>
-      ))} */}
-    </div>
-      {/* <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}><Typography>{loadCase.factor2}</Typography></div>
-      <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}><Typography>{loadCase.factor3}</Typography></div>
-      <div style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}><Typography>{loadCase.factor4}</Typography></div>
-      <div style={{ flex: '1 1 30px', padding: '5px', color: 'black' }}><Typography>{loadCase.factor5}</Typography></div> */}
-    {/* </div>
-  ))}  */}
-    {/* {['factor1', 'factor2', 'factor3', 'factor4', 'factor5'].map((factor, factorIndex) => (
-            <div
-              key={factorIndex}
-              style={{ flex: '1 1 30px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', cursor: 'pointer' }}
-              onClick={() => handleFactorClick(loadCaseIndex, factor)}
-              onBlur={(e) => handleFactorChange(selectedLoadCombinationIndex, loadCaseIndex, factor,e)}
-              contentEditable
-              suppressContentEditableWarning
-            >
-              {editingFactor.index === loadCaseIndex && editingFactor.factor === factor ? (
-                loadCase[factor]
-              ) : (
-                <Typography>{loadCase[factor]}</Typography>
-              )}
-            </div>
-          ))} */}
-        </div>
-      ))}
+    {/* {selectedLoadCombinationIndex >= 0 && ( */}
+    <button
+       onClick={handleAddLoadCase}
+       disabled={isAddingLoadCase}
+      style={{ margin: '10px', padding: '5px 10px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer' }}
+    >
+      Add Load Case
+    </button>
+  {/* )} */}
 </Scrollbars>
-
         </div>
   </Panel>
   </Panel>
       <div style={{  width: '780px', height: '25px', display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly', backgroundColor: 'white', padding: '10px'}}>
-      {Buttons.SubButton("contained", "Import Load Cases", Import_Load_Cases)}
+      {/* {Buttons.SubButton("contained", "Import Load Cases", Import_Load_Cases)} */}
       {Buttons.SubButton("contained", "Export Load Combination",exportToExcel)}
       {Buttons.SubButton("contained", "Import Load Combination",toggleExcelReader)}
       {Buttons.SubButton("contained", "Generate Load Combination",Generate_Load_Combination)}

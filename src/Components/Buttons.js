@@ -4,7 +4,7 @@ import Button from "@midasit-dev/moaui/Components/Button";
 export function MainButton(types, texts, clickevent) {
   return (
     <Stack spacing={2} direction="row">
-      <Button size="small" variant={types} onClick={clickevent} color="negative" width="140px">{texts}</Button>
+      <Button size="small" variant={types} onClick={clickevent} color="negative" width="180px">{texts}</Button>
     </Stack>
   );
 };
@@ -12,7 +12,7 @@ export function MainButton(types, texts, clickevent) {
 export function SubButton(types, texts, clickevent) {
   return (
     <Stack spacing={2} direction="row">
-      <Button size="small" variant={types} onClick={clickevent} color="negative" width="150px">{texts}</Button>
+      <Button size="small" variant={types} onClick={clickevent} color="negative" width="180px">{texts}</Button>
     </Stack>
   );
 };
