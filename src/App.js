@@ -29,7 +29,9 @@ const [editingFactor, setEditingFactor] = useState({ index: null, factor: null }
 const [selectedDropListValue, setSelectedDropListValue] = useState(1);
 const [isAddingLoadCase, setIsAddingLoadCase] = useState(false);
 const addLoadCaseTimeout = useRef(null);
-let loadNames = [];
+const [civilComState, setCivilComState] = useState({ "Assign": {} });
+// let [loadNames, setLoadNames] = useState(null);
+const [civilCom, setCivilCom] = useState({ "Assign": {} });
 
   const toggleLoadCaseDropdown = (index) => {
     setLoadCaseDropdownIndex(loadCaseDropdownIndex === index ? -1 : index);
@@ -91,140 +93,150 @@ let loadNames = [];
       return updatedCombinations;
     });
   };
-  loadNames = [
-    "Dead Load",
-    "Tendon Primary",
-    "Creep Primary",
-    "Shrinkage Primary",
-    "Tendon Secondary",
-    "Creep Secondary",
-    "Shrinkage Secondary",
-  ];
+    // Initialize loadNames with useState
+    let [loadNames, setLoadNames] = useState([
+      "Dead Load",
+      "Tendon Primary",
+      "Creep Primary",
+      "Shrinkage Primary",
+      "Tendon Secondary",
+      "Creep Secondary",
+      "Shrinkage Secondary",
+    ]);
   
-  (async function Import_Load_Cases() {
-    const stct = await midasAPI("GET", "/db/stct");
-    const stldData = await midasAPI("GET", "/db/stld");
-    const smlc = await midasAPI("GET", "/db/smlc");
-    const mvldid = await midasAPI("GET", "/db/mvldid");
-    const mvld = await midasAPI("GET", "/db/mvld");
-    const mvldch = await midasAPI("GET", "/db/mvldch");
-    const mvldeu = await midasAPI("GET", "/db/mvldeu");
-    const mvldbs = await midasAPI("GET", "/db/mvldbs");
-    const mvldpl = await midasAPI("GET", "/db/mvldpl");
-    const splc = await midasAPI("GET", "/db/splc");
+    // Fetch load cases using useEffect
+    useEffect(() => {
+      (async function importLoadCases() {
+        try {
+          const stct = await midasAPI("GET", "/db/stct");
+          const stldData = await midasAPI("GET", "/db/stld");
+          const smlc = await midasAPI("GET", "/db/smlc");
+          const mvldid = await midasAPI("GET", "/db/mvldid");
+          const mvld = await midasAPI("GET", "/db/mvld");
+          const mvldch = await midasAPI("GET", "/db/mvldch");
+          const mvldeu = await midasAPI("GET", "/db/mvldeu");
+          const mvldbs = await midasAPI("GET", "/db/mvldbs");
+          const mvldpl = await midasAPI("GET", "/db/mvldpl");
+          const splc = await midasAPI("GET", "/db/splc");
   
-    if (stct && stct.STCT) {
-      for (const key in stct.STCT) {
-        const item = stct.STCT[key];
-        if (item.vEREC) {
-          item.vEREC.forEach((erec) => {
-            if (erec.LTYPECC) {
-              loadNames.push(erec.LTYPECC);
+          const newLoadNames = [...loadNames]; // Create a copy of the existing loadNames
+  
+          // Process each API response and add to newLoadNames
+          if (stct && stct.STCT) {
+            for (const key in stct.STCT) {
+              const item = stct.STCT[key];
+              if (item.vEREC) {
+                item.vEREC.forEach((erec) => {
+                  if (erec.LTYPECC) {
+                    newLoadNames.push(erec.LTYPECC);
+                  }
+                });
+              }
             }
-          });
-        }
-      }
-    }
-  
-    if (stldData && Object.keys(stldData)[0].length > 0) {
-      const stldKeys = Object.keys(stldData)[0];
-      if (stldKeys && stldKeys.length > 0) {
-        for (const key in stldData[stldKeys]) {
-          if (stldData[stldKeys].hasOwnProperty(key)) {
-            const name = stldData[stldKeys][key].NAME;
-            loadNames.push(name);
           }
-        }
-      }
-    }
   
-    if (smlc && smlc.SMLC) {
-      for (const key in smlc.SMLC) {
-        const item = smlc.SMLC[key];
-        if (item.NAME) {
-          loadNames.push(item.NAME);
-        }
-      }
-    }
-  
-    if (mvldid && mvldid.MVLDID) {
-      for (const key in mvldid.MVLDID) {
-        if (mvldid.MVLDID.hasOwnProperty(key)) {
-          const item = mvldid.MVLDID[key];
-          if (item && item.LCNAME) {
-            loadNames.push(item.LCNAME);
+          if (stldData && Object.keys(stldData)[0].length > 0) {
+            const stldKeys = Object.keys(stldData)[0];
+            if (stldKeys && stldKeys.length > 0) {
+              for (const key in stldData[stldKeys]) {
+                if (stldData[stldKeys].hasOwnProperty(key)) {
+                  const name = stldData[stldKeys][key].NAME;
+                  newLoadNames.push(name);
+                }
+              }
+            }
           }
-        }
-      }
-    }
   
-    if (mvld && mvld.MVLD) {
-      for (const key in mvld.MVLD) {
-        if (mvld.MVLD.hasOwnProperty(key)) {
-          const item = mvld.MVLD[key];
-          if (item && item.LCNAME) {
-            loadNames.push(item.LCNAME);
+          if (smlc && smlc.SMLC) {
+            for (const key in smlc.SMLC) {
+              const item = smlc.SMLC[key];
+              if (item.NAME) {
+                newLoadNames.push(item.NAME);
+              }
+            }
           }
-        }
-      }
-    }
   
-    if (mvldch && mvldch.MVLDCH) {
-      for (const key in mvldch.MVLDCH) {
-        if (mvldch.MVLDCH.hasOwnProperty(key)) {
-          const item = mvldch.MVLDCH[key];
-          if (item && item.LCNAME) {
-            loadNames.push(item.LCNAME);
+          if (mvldid && mvldid.MVLDID) {
+            for (const key in mvldid.MVLDID) {
+              if (mvldid.MVLDID.hasOwnProperty(key)) {
+                const item = mvldid.MVLDID[key];
+                if (item && item.LCNAME) {
+                  newLoadNames.push(item.LCNAME);
+                }
+              }
+            }
           }
-        }
-      }
-    }
   
-    if (mvldeu && mvldeu.MVLDEU) {
-      for (const key in mvldeu.MVLDEU) {
-        if (mvldeu.MVLDEU.hasOwnProperty(key)) {
-          const item = mvldeu.MVLDEU[key];
-          if (item && item.LCNAME) {
-            loadNames.push(item.LCNAME);
+          if (mvld && mvld.MVLD) {
+            for (const key in mvld.MVLD) {
+              if (mvld.MVLD.hasOwnProperty(key)) {
+                const item = mvld.MVLD[key];
+                if (item && item.LCNAME) {
+                  newLoadNames.push(item.LCNAME);
+                }
+              }
+            }
           }
-        }
-      }
-    }
   
-    if (mvldbs && mvldbs.MVLDBS) {
-      for (const key in mvldbs.MVLDBS) {
-        if (mvldbs.MVLDBS.hasOwnProperty(key)) {
-          const item = mvldbs.MVLDBS[key];
-          if (item && item.LCNAME) {
-            loadNames.push(item.LCNAME);
+          if (mvldch && mvldch.MVLDCH) {
+            for (const key in mvldch.MVLDCH) {
+              if (mvldch.MVLDCH.hasOwnProperty(key)) {
+                const item = mvldch.MVLDCH[key];
+                if (item && item.LCNAME) {
+                  newLoadNames.push(item.LCNAME);
+                }
+              }
+            }
           }
-        }
-      }
-    }
   
-    if (mvldpl && mvldpl.MVLDPL) {
-      for (const key in mvldpl.MVLDPL) {
-        if (mvldpl.MVLDPL.hasOwnProperty(key)) {
-          const item = mvldpl.MVLDPL[key];
-          if (item && item.LCNAME) {
-            loadNames.push(item.LCNAME);
+          if (mvldeu && mvldeu.MVLDEU) {
+            for (const key in mvldeu.MVLDEU) {
+              if (mvldeu.MVLDEU.hasOwnProperty(key)) {
+                const item = mvldeu.MVLDEU[key];
+                if (item && item.LCNAME) {
+                  newLoadNames.push(item.LCNAME);
+                }
+              }
+            }
           }
-        }
-      }
-    }
   
-    if (splc && splc.SPLC) {
-      for (const key in splc.SPLC) {
-        const item = splc.SPLC[key];
-        if (item.NAME) {
-          loadNames.push(item.NAME);
-        }
-      }
-    }
+          if (mvldbs && mvldbs.MVLDBS) {
+            for (const key in mvldbs.MVLDBS) {
+              if (mvldbs.MVLDBS.hasOwnProperty(key)) {
+                const item = mvldbs.MVLDBS[key];
+                if (item && item.LCNAME) {
+                  newLoadNames.push(item.LCNAME);
+                }
+              }
+            }
+          }
   
-    console.log(loadNames); // Log loadNames after all API calls are complete
-  })();
-  console.log(loadNames);
+          if (mvldpl && mvldpl.MVLDPL) {
+            for (const key in mvldpl.MVLDPL) {
+              if (mvldpl.MVLDPL.hasOwnProperty(key)) {
+                const item = mvldpl.MVLDPL[key];
+                if (item && item.LCNAME) {
+                  newLoadNames.push(item.LCNAME);
+                }
+              }
+            }
+          }
+  
+          if (splc && splc.SPLC) {
+            for (const key in splc.SPLC) {
+              const item = splc.SPLC[key];
+              if (item.NAME) {
+                newLoadNames.push(item.NAME);
+              }
+            }
+          }
+          // Update the loadNames state with the new values
+          setLoadNames(newLoadNames);
+        } catch (error) {
+          console.error('Error fetching load cases:', error);
+        }
+      })();
+    }, []); // Empty dependency array to run once on mount
 
 function importLoadCombinationInput(data) {
   setLoadCombinations(data);
@@ -233,43 +245,175 @@ function importLoadCombinationInput(data) {
     setSelectedLoadCombinationIndex(index);
   };
   console.log(selectedDropListValue);
+  // const exportToExcel = () => {
+  //   console.log(loadNames);
+  //   console.log(civilCom);
+  //   console.log(loadCombinations);
+  //   loadNames = Array.from(new Set(loadNames));
+  //   console.log(loadNames);
+  //   // Function to convert column index to Excel column letter (e.g., 3 -> "D")
+  //   // const getColumnLetter = (colIndex) => {
+  //   //   let letter = '';
+  //   //   while (colIndex >= 0) {
+  //   //     letter = String.fromCharCode((colIndex % 26) + 65) + letter;
+  //   //     colIndex = Math.floor(colIndex / 26) - 1;
+  //   //   }
+  //   //   return letter;
+  //   // };
+  
+  //   const workbook = new ExcelJS.Workbook();
+  
+  //   // Add a new worksheet to the workbook
+  //   const worksheet = workbook.addWorksheet('Load Combinations');
+  
+  //   // Add headers to the first row
+  //   // worksheet.getCell('A1').value = 'Name';
+  //   // worksheet.getCell('B1').value = 'Active';
+  //   // worksheet.getCell('C1').value = 'Type';
+  
+  //   // // Gather all unique LCNAMEs
+  //   // let lcNames = new Set();
+  //   // Object.keys(civilCom.Assign).forEach((key) => {
+  //   //   const combination = civilCom.Assign[key];
+  //   //   combination.vCOMB.forEach((item) => {
+  //   //     lcNames.add(item.LCNAME); // Add unique LCNAMEs to the set
+  //   //   });
+  //   // });
+  
+  //   // Convert lcNames Set to Array for easy iteration
+  //   // lcNames = Array.from(lcNames);
+  
+  //   // Add LCNAME headers to the first row starting from column D
+  //   // lcNames.forEach((lcname, index) => {
+  //   //   const columnLetter = getColumnLetter(3 + index); // Starting from "D" (index 3)
+  //   //   worksheet.getCell(`${columnLetter}1`).value = lcname; // Place each LCNAME in row 1 across columns
+  //   // });
+  
+  //   // Add loadNames headers to the first row starting after LCNAME columns
+  //   // loadNames.forEach((name, index) => {
+  //   //   const columnLetter = getColumnLetter(3 + index); // Adjust column for loadNames
+  //   //   worksheet.getCell(`${columnLetter}1`).value = name; // Place each loadName in row 1
+  //   // });
+  
+  //   // // Iterate over Assign object and add the NAME, ACTIVE, and FACTOR values
+  //   // let rowIndex = 2; // Start from row 2 (since row 1 is for headers)
+  //   // Object.keys(civilCom.Assign).forEach((key) => {
+  //   //   const combination = civilCom.Assign[key];
+  //   //   const name = combination.NAME;
+  //   //   const active = combination.ACTIVE;
+  //   //   const type = combination.iTYPE;
+  
+  //   //   // Set the NAME, ACTIVE, and TYPE values in columns A, B, and C
+  //   //   worksheet.getCell(`A${rowIndex}`).value = name;
+  //   //   worksheet.getCell(`B${rowIndex}`).value = active;
+  //   //   worksheet.getCell(`C${rowIndex}`).value = type;
+  
+  //   //   // Iterate through vCOMB to set the FACTOR values for each LCNAME
+  //   //   combination.vCOMB.forEach((item) => {
+  //   //     const lcname = item.LCNAME;
+  //   //     const factor = item.FACTOR;
+  
+  //   //     // Check if the LCNAME is in the loadNames array
+  //   //     const loadNameIndex = loadNames.indexOf(lcname);
+  //   //     if (loadNameIndex !== -1) {
+  //   //       // Find the correct column for this loadName in the worksheet
+  //   //       const columnIndex = 3 + loadNameIndex; // Adjust column based on lcNames and loadNames
+  //   //       const columnLetter = getColumnLetter(columnIndex);
+          
+  //   //       // Set the factor in the correct cell for the current row
+  //   //       worksheet.getCell(`${columnLetter}${rowIndex}`).value = factor;
+  //   //     }
+  //   //   });
+  
+  //   //   // Increment rowIndex for the next row
+  //   //   rowIndex++;
+  //   // });
+  
+  //   // Write the workbook to a buffer and save it as an Excel file
+  //   workbook.xlsx.writeBuffer()
+  //     .then((buffer) => {
+  //       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  //       saveAs(blob, 'Load_Combination_Input.xlsx'); // Save the file to the user's system
+  //     })
+  //     .catch((err) => {
+  //       console.error('Error creating Excel file:', err);
+  //     });
+  // };
   const exportToExcel = () => {
     console.log(loadNames);
-    // Create a new workbook
+    console.log(civilCom);
+    console.log(loadCombinations);
+    loadNames = Array.from(new Set(loadNames));
+    console.log(loadNames);
+
     const workbook = new ExcelJS.Workbook();
 
     // Add a new worksheet to the workbook
     const worksheet = workbook.addWorksheet('Load Combinations');
+
     // Add headers to the first row
-  worksheet.getCell('A1').value = 'Name';
-  worksheet.getCell('B1').value = 'Active';
-  worksheet.getCell('C1').value = 'Type';
+    worksheet.getCell('A1').value = 'Load Combination';
+    worksheet.getCell('B1').value = 'Active';
+    worksheet.getCell('C1').value = 'Type';
+    worksheet.getCell('D1').value = 'Load Cases';
+    worksheet.getCell('E1').value = 'Sign';
+    worksheet.getCell('F1').value = 'Factor 1';
+    worksheet.getCell('G1').value = 'Factor 2';
+    worksheet.getCell('H1').value = 'Factor 3';
+    worksheet.getCell('I1').value = 'Factor 4';
+    worksheet.getCell('J1').value = 'Factor 5';
 
-  // Write loadNames in the first row starting from the 4th column
-  loadNames.forEach((name, index) => {
-    const columnLetter = String.fromCharCode(68 + index); // 'D' is ASCII 68
-    worksheet.getCell(`${columnLetter}1`).value = name;
-  });
+    let rowIndex = 2; // Start from row 2 (since row 1 is for headers)
 
-    // Optional: Add headers to the worksheet
-    // worksheet.columns = [
-    //   { header: 'Load Case', key: 'load_case', width: 30 },
-    //   { header: 'Factor 1', key: 'factor1', width: 15 },
-    //   { header: 'Factor 2', key: 'factor2', width: 15 }
-    // ];
+    loadCombinations.forEach((combination) => {
+        const loadCombination = combination.loadCombination;
+        const active = combination.active;
+        const type = combination.type;
 
-    // // Example rows (you can replace this with dynamic data)
-    // worksheet.addRow({ load_case: 'Case 1', factor1: 1.5, factor2: 0.9 });
-    // worksheet.addRow({ load_case: 'Case 2', factor1: 1.2, factor2: 1.0 });
+        // Add the Load Combination, Active, Type values to columns A, B, and C
+        worksheet.getCell(`A${rowIndex}`).value = loadCombination;
+        worksheet.getCell(`B${rowIndex}`).value = active;
+        worksheet.getCell(`C${rowIndex}`).value = type;
+
+        // Iterate over each loadCase and add the respective data (Load Cases, Sign, Factors)
+        combination.loadCases.forEach((loadCase, index) => {
+            const loadCaseName = loadCase.loadCaseName;
+            const sign = loadCase.sign;
+            const factor1 = loadCase.factor1;
+            const factor2 = loadCase.factor2;
+            const factor3 = loadCase.factor3 || ''; // Handle undefined factors
+            const factor4 = loadCase.factor4 || '';
+            const factor5 = loadCase.factor5 || '';
+
+            // If it's not the first load case, move to the next row
+            if (index !== 0) {
+                rowIndex++;
+            }
+
+            // Set the Load Cases, Sign, and Factor values in the corresponding columns
+            worksheet.getCell(`D${rowIndex}`).value = loadCaseName;
+            worksheet.getCell(`E${rowIndex}`).value = sign;
+            worksheet.getCell(`F${rowIndex}`).value = factor1;
+            worksheet.getCell(`G${rowIndex}`).value = factor2;
+            worksheet.getCell(`H${rowIndex}`).value = factor3;
+            worksheet.getCell(`I${rowIndex}`).value = factor4;
+            worksheet.getCell(`J${rowIndex}`).value = factor5;
+
+            rowIndex++; // Move to the next row after processing each load case
+        });
+    });
 
     // Write the workbook to a buffer and save it as an Excel file
-    workbook.xlsx.writeBuffer().then((buffer) => {
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, 'Load_Combination_Input.xlsx');  // Save the file to the user's system
-    }).catch(err => {
-      console.error('Error creating Excel file:', err);
-    });
-  };
+    workbook.xlsx.writeBuffer()
+        .then((buffer) => {
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            saveAs(blob, 'Load_Combination_Input.xlsx'); // Save the file to the user's system
+        })
+        .catch((err) => {
+            console.error('Error creating Excel file:', err);
+        });
+};
+ 
 function getLoadCaseFactors(loadCaseName, combinations) {
   const cleanedLoadCaseName = loadCaseName.replace(/\s*\(CB\)$/, '');
   for (const combo of combinations) {
@@ -310,13 +454,6 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
       if (i === factor) {
         multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 0;
       }
-      // const previousFactor = factorIndexArray.length > 0 ? factorIndexArray[factorIndexArray.length - 1 - 1] - 1 : i - 1;
-
-      // const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(previousFactor)); // Adjust for `n` dimensions
-
-      // Set the value in the n-dimensional array using the dynamic indices
-      // Remove the last value from factorIndexArray
- // Handling dimension 1
  if (dimension === 1) {
   // In 1D array, we simply set the value at the first index
   setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, [i - 1]);
@@ -742,9 +879,11 @@ function multipleFactor(input) {
   return { eitherArray, addObj };
 }
 function findStrengthCombinations(combinations) {
-  return combinations.filter(combo => combo.active === "Strength");
+  return combinations.filter(combo => 
+    combo.active === "Strength" || combo.active === "Service"
+  );
 }
-
+// const civil_com = { "Assign": {} };
 async function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
   if (strengthCombinations.length === 0) {
@@ -752,7 +891,6 @@ async function generateBasicCombinations(loadCombinations) {
     return [];
   }
   const allFinalCombinations = [];
-  const civil_com = { "Assign": {} };
   // Iterate over each strengthCombination
   for (const strengthCombination of strengthCombinations) {
     const comb_name = strengthCombination.loadCombination;
@@ -767,31 +905,31 @@ async function generateBasicCombinations(loadCombinations) {
         if (factorKey in loadCase) {
           // Extract the specific factor value
           const factorValue = loadCase[factorKey];
-          factors.push({ factor, value: factorValue }); 
+          factors.push({ factor, value: factorValue });
         } else {
           factors.push({ factor, value: 1 });
         }
         // Check if all factors are undefined, and if so, set factor1 to 1
         const allFactorsUndefined = factors.every(f => f.value === undefined);
-      if (allFactorsUndefined) {
+        if (allFactorsUndefined) {
           const factor1 = factors.find(f => f.factor === 1);
           if (factor1) {
             factor1.value = 1;
+          }
+        }
       }
-      }      
-    }
-    const sign = loadCase.sign || '+';
-    console.log(factors);
-        for (let factor = 1; factor <= 5; factor++) {
-          const factorObject = factors.find(f => f.factor === factor);
-          // Check if the factor value is defined
+      const sign = loadCase.sign || '+';
+      console.log(factors);
+      for (let factor = 1; factor <= 5; factor++) {
+        const factorObject = factors.find(f => f.factor === factor);
+        // Check if the factor value is defined
         if (factorObject && factorObject.value !== undefined) {
-          const new_11 = createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor,sign);
+          const new_11 = createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor, sign);
           console.log(new_11);
-            // Combine and permute the results
+          // Combine and permute the results
           const result11 = combineAddEither([new_11]);
           console.log(result11);
-          const finalCombinations_sign = permutation_sign(result11);  
+          const finalCombinations_sign = permutation_sign(result11);
           console.log(finalCombinations_sign);
           const fact = join_factor(finalCombinations_sign);
           console.log(fact);
@@ -803,7 +941,7 @@ async function generateBasicCombinations(loadCombinations) {
     // Push the combinations for this strengthCombination to allFinalCombinations
     const joinedCombinations = join(factorCombinations);
     console.log(joinedCombinations);
-    // allFinalCombinations.push(joinedCombinations);
+
     if (type === 'Add') {
       const joinedComb = [];
       // Recursive helper function to generate combinations from joinArray
@@ -825,33 +963,36 @@ async function generateBasicCombinations(loadCombinations) {
       allFinalCombinations.push(joinedComb);
       joinedComb.forEach((combArray, idx) => {
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
-        
+
         // Prepare the vCOMB structure for this combination
         const vCOMB = combArray.map((comb) => ({
           "ANAL": "ST", // Replace "RS" with your required analysis type
           "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
           "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
         }));
-      
-        // Add this combination to the civil_com object under "Assign" using dynamic key with brackets
-        civil_com["Assign"] = civil_com["Assign"] || {}; // Ensure "Assign" exists
-        civil_com["Assign"][`${idx + 1}`] = {
-          "NAME": combinationName,    // Name of the combination
-          "ACTIVE": "ACTIVE",         // Set "ACTIVE" as per your requirement
-          "bCB": false,               // Set bCB value as per your requirement
-          "iTYPE": 0,                 // Set iTYPE value as per your requirement  
-          "vCOMB": vCOMB              // vCOMB contains the combinations
-        };
+
+        // Update the state (using setCivilCom) instead of directly modifying civil_com
+        setCivilCom(prevState => {
+          const newAssign = { ...prevState.Assign };
+          newAssign[`${idx + 1}`] = {
+            "NAME": combinationName,
+            "ACTIVE": "ACTIVE",
+            "bCB": false,
+            "iTYPE": 0,
+            "vCOMB": vCOMB
+          };
+          return { ...prevState, Assign: newAssign };
+        });
       });
-      
-      // Verify the object structure
-    const civilComJson = JSON.stringify(civil_com, null, 2);
-    console.log(civilComJson);  // This ensures that the JSON is correctly formatted with commas
-    const response = await midasAPI("POST",'/db/lcom-gen',civil_com);
-    console.log(response);
+
+      // API call
+      const civilComJson = JSON.stringify(civilCom, null, 2);
+      console.log(civilComJson);  // This ensures that the JSON is correctly formatted with commas
+      const response = await midasAPI("POST", '/db/lcom-gen', civilCom);
+      console.log(response);
     }
     if (type === "either") {
-      const concatenatedArray = joinedCombinations.flat(); 
+      const concatenatedArray = joinedCombinations.flat();
       console.log(concatenatedArray);
       concatenatedArray.forEach((combArray, idx) => {
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
@@ -860,20 +1001,24 @@ async function generateBasicCombinations(loadCombinations) {
           "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
           "FACTOR": comb.sign * comb.factor // Assuming comb has properties `sign` and `factor`
         }));
-  
-        // Add this combination to the civil_com object under Assign
-        civil_com.Assign[idx + 1] = {
-          "NAME": combinationName,
-          "KIND": "GEN",          // Setting "KIND" to "GEN" as specified
-          "ACTIVE": "INACTIVE",   // Setting "ACTIVE" to "INACTIVE"
-          "iTYPE": 0,             // Setting "iTYPE" to 0 as specified
-          "DESC": "desc",         // You can modify the description as needed
-          "vCOMB": vCOMB          // The vCOMB array containing combinations
-        };
+
+        // Update the state (using setCivilCom) for the "either" type as well
+        setCivilCom(prevState => {
+          const newAssign = { ...prevState.Assign };
+          newAssign[`${idx + 1}`] = {
+            "NAME": combinationName,
+            "KIND": "GEN",
+            "ACTIVE": "INACTIVE",
+            "iTYPE": 0,
+            "DESC": "desc",
+            "vCOMB": vCOMB
+          };
+          return { ...prevState, Assign: newAssign };
+        });
       });
-    console.log(civil_com);
+      console.log(civilCom);
     }
-}
+  }
   console.log(allFinalCombinations);
   return allFinalCombinations;
 }
@@ -949,7 +1094,7 @@ function join_factor(finalCombinations_sign ) {
             const currentArray = mainArray[0];
             
             // Check if currentArray also has only one subarray
-            if (currentArray.length === 1) {
+            if (currentArray.length === 1 && !Array.isArray(currentArray[0])) {
               // If so, directly send it to combinedArray
               combinedArray.push(currentArray); // Push the single subarray directly
               flattenedAddObj.push([...deepFlatten(combinedArray)]);
@@ -1054,51 +1199,86 @@ if (Array.isArray(addObj)) {
       // Iterate through each index of the first inner array (assuming all sub-arrays have the same length)
       for (let i = 0; i < length; i++) {
         const combinedFactors = []; // Array to hold the factors for the current index
-
-        // Loop through each item in the current outer array
-        currentArray.forEach(item => {
-          // Check if the item is an object and contains loadCaseName and factor
-          if (item && typeof item === 'object' && item.loadCaseName && item.factor) {
-            const key = `${item.loadCaseName}|${item.sign}`;
-            
-            // Initialize the result object if it doesn't exist
-            if (!result[key]) {
-              result[key] = {
-                loadCaseName: item.loadCaseName,
-                sign: item.sign,
-                factor: []
-              };
-            }
-            // Ensure the factor array exists for this index
-            if (!result[key].factor[i]) {
-              result[key].factor[i] = undefined; // Initialize if undefined
-            }
-            // If the item contains factors, merge them
-            if (Array.isArray(item.factor[i])) {
-              // Merge existing factors with new factors
-              mergeFactors(result[key].factor[i], item.factor[i]);
-            }
-            
-            if (Array.isArray(item)) {
-              item.forEach(innerItem => {
-                if (innerItem && innerItem.loadCaseName && innerItem.factor) {
-                  const innerKey = `${innerItem.loadCaseName}|${innerItem.sign}`;
-                  if (!result[innerKey]) {
-                    result[innerKey] = {
-                      loadCaseName: innerItem.loadCaseName,
-                      sign: innerItem.sign,
-                      factor: []
-                    };
+      
+        // // If currentArray length is 1, handle it separately
+        // if (currentArray.length === 1) {
+        //   const items = currentArray[0][0];
+      
+        //   // Check if the item is an object and contains loadCaseName and factor
+        //   items.forEach(item => {
+        //     // Check if the item is an object and contains loadCaseName and factor
+        //     if (item && typeof item === 'object' && item.loadCaseName && item.factor) {
+        //       const key = `${item.loadCaseName}|${item.sign}`;
+        
+        //       // Initialize the result object if it doesn't exist
+        //       if (!result[key]) {
+        //         result[key] = {
+        //           loadCaseName: item.loadCaseName,
+        //           sign: item.sign,
+        //           factor: []
+        //         };
+        //       }
+        //       // Ensure the factor array exists for this index
+        //       if (!result[key].factor[i]) {
+        //         result[key].factor[i] = undefined; // Initialize if undefined
+        //       }
+        
+        //       // Set the factor directly without merging
+        //       if (Array.isArray(item.factor[i])) {
+        //         result[key].factor[i] = item.factor[i]; // Directly set the factor
+        //       }
+        //     }
+        //   });
+        // } else {
+          // Loop through each item in the current outer array
+          currentArray.forEach(item => {
+            // Check if the item is an object and contains loadCaseName and factor
+            if (item && typeof item === 'object' && item.loadCaseName && item.factor) {
+              const key = `${item.loadCaseName}|${item.sign}`;
+      
+              // Initialize the result object if it doesn't exist
+              if (!result[key]) {
+                result[key] = {
+                  loadCaseName: item.loadCaseName,
+                  sign: item.sign,
+                  factor: []
+                };
+              }
+      
+              // Ensure the factor array exists for this index
+              if (!result[key].factor[i]) {
+                result[key].factor[i] = undefined; // Initialize if undefined
+              }
+      
+              // If the item contains factors, merge them
+              if (Array.isArray(item.factor[i])) {
+                // Merge existing factors with new factors
+                mergeFactors(result[key].factor[i], item.factor[i]);
+              }
+      
+              // If item is an array, handle inner items
+              if (Array.isArray(item)) {
+                item.forEach(innerItem => {
+                  if (innerItem && innerItem.loadCaseName && innerItem.factor) {
+                    const innerKey = `${innerItem.loadCaseName}|${innerItem.sign}`;
+                    if (!result[innerKey]) {
+                      result[innerKey] = {
+                        loadCaseName: innerItem.loadCaseName,
+                        sign: innerItem.sign,
+                        factor: []
+                      };
+                    }
+                    if (Array.isArray(innerItem.factor[i])) {
+                      mergeFactors(result[innerKey].factor[i], innerItem.factor[i]);
+                    }
                   }
-                  if (Array.isArray(innerItem.factor[i])) {
-                    mergeFactors(result[innerKey].factor[i], innerItem.factor[i]);
-                  }
-                }
-              });
+                });
+              }
             }
-          }
-        });
+          });
+        // }
       }
+      
       // Push the merged results for the current outer array
       commonArray_Add.push(result);
     }
@@ -1143,7 +1323,7 @@ if (Array.isArray(addObj)) {
         });
       });
     };
-    processFactorsArray(commonArray_add);
+     processFactorsArray(commonArray_add);
 processFactorsArray(commonArray_Either);
 console.log(commonArray_Add);
 console.log(commonArray_Either);
