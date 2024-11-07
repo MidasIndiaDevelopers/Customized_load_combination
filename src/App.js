@@ -6,6 +6,7 @@ import { CheckGroup,Check } from '@midasit-dev/moaui';
 import Sep from "@midasit-dev/moaui/Components/Separator";
 import ExcelReader from './Components/ExcelReader';
 import * as XLSX from 'xlsx';
+import { useSnackbar, SnackbarProvider } from "notistack";
 import { Panel } from '@midasit-dev/moaui';
 import { Typography } from '@midasit-dev/moaui';
 import ComponentsPanelTypographyDropList from './Components/ComponentsPanelTypographyDropList';
@@ -32,7 +33,7 @@ const addLoadCaseTimeout = useRef(null);
 const [civilComState, setCivilComState] = useState({ "Assign": {} });
 // let [loadNames, setLoadNames] = useState(null);
 const [civilCom, setCivilCom] = useState({ "Assign": {} });
-
+const { enqueueSnackbar } = useSnackbar();
   const toggleLoadCaseDropdown = (index) => {
     setLoadCaseDropdownIndex(loadCaseDropdownIndex === index ? -1 : index);
   };
@@ -66,6 +67,13 @@ const [civilCom, setCivilCom] = useState({ "Assign": {} });
       factorKey,
       newValue,
     });
+    const action = snackbarId => (
+      <>
+        <button style={{ backgroundColor: 'transparent', border: 'none',color: 'white', cursor: 'pointer' }} onClick={() => { closeSnackbar(snackbarId) }}>
+          Dismiss
+        </button>
+      </>
+    );
     const trimmedValue = newValue.trim();
     const updatedValue = isNaN(parseFloat(trimmedValue)) ? undefined : parseFloat(trimmedValue);
   
@@ -93,6 +101,7 @@ const [civilCom, setCivilCom] = useState({ "Assign": {} });
       return updatedCombinations;
     });
   };
+
     // Initialize loadNames with useState
     let [loadNames, setLoadNames] = useState([
       "Dead Load",
@@ -988,9 +997,41 @@ async function generateBasicCombinations(loadCombinations) {
       // API call
       const civilComJson = JSON.stringify(civilCom, null, 2);
       console.log(civilComJson);  // This ensures that the JSON is correctly formatted with commas
-      const response = await midasAPI("POST", '/db/lcom-gen', civilCom);
-      console.log(response);
-    }
+      try {
+        const response = await midasAPI("POST", '/db/lcom-steel', civilCom);
+        console.log(response);
+      
+        // Check if the LCOM-STEEL property exists in the response
+        if (response && response['LCOM-STEEL']) {
+          enqueueSnackbar("Load-Combination Generated Successfully", {
+            variant: "success",
+            anchorOrigin: {
+              vertical: "top",
+              horizontal: "center",
+            }
+          });
+        } else {
+          // Handle the case where LCOM-STEEL is not present
+          // enqueueSnackbar("Failed to generate Load-Combination", {
+          //   variant: "error",
+          //   anchorOrigin: {
+          //     vertical: "top",
+          //     horizontal: "center",
+          //   }
+          // });
+        }
+      } 
+      catch (error) {
+        // console.error("Error occurred:", error);
+        // enqueueSnackbar("An error occurred while generating Load-Combination", {
+        //   variant: "error",
+        //   anchorOrigin: {
+        //     vertical: "top",
+        //     horizontal: "center",
+        //   }
+        // });
+      }
+  }
     if (type === "either") {
       const concatenatedArray = joinedCombinations.flat();
       console.log(concatenatedArray);
@@ -1094,7 +1135,7 @@ function join_factor(finalCombinations_sign ) {
             const currentArray = mainArray[0];
             
             // Check if currentArray also has only one subarray
-            if (currentArray.length === 1 && !Array.isArray(currentArray[0])) {
+            if (currentArray.length === 1 && Array.isArray(currentArray[0]) && currentArray[0].every(item => !Array.isArray(item))) {
               // If so, directly send it to combinedArray
               combinedArray.push(currentArray); // Push the single subarray directly
               flattenedAddObj.push([...deepFlatten(combinedArray)]);
@@ -1185,7 +1226,6 @@ function join_factor(finalCombinations_sign ) {
     let result = []; // Initialize a result array for each iteration
   console.log("Processing flattenedAddObj item:", item);
   const combined = combineFactors(Array.isArray(item) ? item : [item]); 
-  
   result.push(combined); // Push the combined result into the result array
   commonArray_add.push(result); // Add the result array to the common array as a sub-array
 });
@@ -1303,7 +1343,6 @@ if (Array.isArray(addObj)) {
               item[index] = undefined; // Add missing key with value `undefined`
             }
           }
-    
           return item;
         } else {
           return item === "empty" ? undefined : item;
@@ -1558,10 +1597,8 @@ console.log(mergeArray);
           finalCombinations.push([...tempResult]);
           return;
         }
-      
         // Debugging statement to check what arrays[index] contains
         console.log("Current index:", index, "arrays[index]:", arrays[index]);
-      
         // Check if arrays[index] is an array and is iterable
         if (Array.isArray(arrays[index])) {
           // Loop through each item in the current array at 'index'
@@ -1577,7 +1614,6 @@ console.log(mergeArray);
         return finalCombinations;  // Return all combinations generated
       }
       let combinedResult  = [];
-      
       for (const outerArray of mergeArray) {
         let finalCombinations = [];
         let combinations = [];
@@ -1687,13 +1723,16 @@ console.log(joinedCombinations);
     const addJoin = [];
     if (either.length === 0 && add.length > 0) {
       const combined = [];
-    
+      
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
         for (let i = 0; i < 5; i++) {
-          const allCombinations = [];
+          let allCombinations = [];
           let shouldBreak = false; // Flag to determine whether to break the outer loop
     
           add.forEach(addArray => {
+            // Variable to hold combinations for each addArray separately
+            let subArrayCombination = [];
+    
             if (Array.isArray(addArray) && addArray.length > 0) {
               addArray.forEach(item => {
                 Object.keys(item).forEach(key => {
@@ -1707,48 +1746,49 @@ console.log(joinedCombinations);
                     factorValue = getSingleFactor(factor, factorIndex, i);
                   } else {
                     factorValue = factor;
-                    
-                    // Execute the code below after setting factorValue
-                    if (factorValue !== undefined && factorValue !== 0) {
-                      const combinedResult = { loadCaseName, sign, factor: factorValue };
-                      allCombinations.push(combinedResult);
-                      
-                      // Set the flag to true and break from the outer loop
-                      shouldBreak = true; 
-                      return; // Exit the innermost loop
-                    }
                   }
     
-                  // Continue to push combinedResult for array factors
+                  // Check if factorValue is valid and non-zero, then push it into subArrayCombination
                   if (factorValue !== undefined && factorValue !== 0) {
                     const combinedResult = { loadCaseName, sign, factor: factorValue };
-                    allCombinations.push(combinedResult);
+                    subArrayCombination.push(combinedResult);
+    
+                    if (!Array.isArray(factor)) {
+                      // Set the flag to true for non-array factors and exit inner loops
+                      shouldBreak = true;
+                      return; // Exit the innermost loop
+                    }
                   }
                 });
               });
             }
     
-            // Check the flag after processing addArray
+            // After processing the entire addArray, add subArrayCombination to allCombinations
+            if (subArrayCombination.length > 0) {
+              allCombinations.push(subArrayCombination);
+            }
+    
             if (shouldBreak) {
               return; // Break out of the forEach loop as well
             }
           });
     
-          // Break the outer loop if the condition was me
+          // Push allCombinations to combined if it has entries
           if (allCombinations.length > 0) {
             combined.push(allCombinations);
           }
-        if (shouldBreak) {
-          break; // Break out of the 'i' loop
+    
+          if (shouldBreak) {
+            break; // Break out of the 'i' loop
+          }
         }
       }
-      }
-      
       addJoin.push(...combined);
-      joinArray.push(addJoin);
+      const flattenedAddJoin = addJoin.flat(1); // Flatten by one level
+      
+      // Push the flattened array to joinArray
+      joinArray.push(flattenedAddJoin);
     }
-    
-    
   }
   console.log("Extracted Factors Store: ", extractedFactorsStore);
   return joinArray;
