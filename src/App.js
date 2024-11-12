@@ -10,6 +10,7 @@ import { useSnackbar, SnackbarProvider } from "notistack";
 import { Panel } from '@midasit-dev/moaui';
 import { Typography } from '@midasit-dev/moaui';
 import ComponentsPanelTypographyDropList from './Components/ComponentsPanelTypographyDropList';
+import ComponentsButtonLoading from './Components/ComponentsButtonLoading';
 import { Scrollbars } from '@midasit-dev/moaui';
 import ComponentsDialogHelpIconButton from './Components/ComponentsDialogHelpIconButton';
 import { midasAPI } from "./Function/Common";
@@ -37,6 +38,14 @@ const [checkedOptions, setCheckedOptions] = useState({
   generateEnvelop: false,
   generateInactive: false,
 });
+const [values, setValues] = useState({
+  "Generate envelop load combinations in midas": false,
+  "Generate inactive load combinations in midas": false,
+});
+console.log(values);
+const [exportLoading, setExportLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [generateLoading, setGenerateLoading] = useState(false);
 const { enqueueSnackbar } = useSnackbar();
   const toggleLoadCaseDropdown = (index) => {
     setLoadCaseDropdownIndex(loadCaseDropdownIndex === index ? -1 : index);
@@ -71,13 +80,6 @@ const { enqueueSnackbar } = useSnackbar();
       factorKey,
       newValue,
     });
-    // const action = snackbarId => (
-    //   <>
-    //     <button style={{ backgroundColor: 'transparent', border: 'none',color: 'white', cursor: 'pointer' }} onClick={() => { closeSnackbar(snackbarId) }}>
-    //       Dismiss
-    //     </button>
-    //   </>
-    // );
     const trimmedValue = newValue.trim();
     const updatedValue = isNaN(parseFloat(trimmedValue)) ? undefined : parseFloat(trimmedValue);
   
@@ -376,6 +378,8 @@ function importLoadCombinationInput(data) {
   //     });
   // };
   const exportToExcel = () => {
+    setExportLoading(true);
+    try {
     console.log(loadNames);
     console.log(civilCom);
     console.log(loadCombinations);
@@ -448,6 +452,11 @@ function importLoadCombinationInput(data) {
         .catch((err) => {
             console.error('Error creating Excel file:', err);
         });
+      } catch (error) {
+        console.error("Error exporting:", error);
+      } finally {
+        setExportLoading(false);  // Set loading state back to false when done
+      }
 };
  
 function getLoadCaseFactors(loadCaseName, combinations) {
@@ -1048,7 +1057,7 @@ for (const subArray of factorArray) {
   joinedCombinations.push(joinedResult);
 }
 console.log(joinedCombinations);
-
+let updateCombinations = [];
     if (type === 'Add') {
       let joinedComb = [];
       // Recursive helper function to generate combinations from joinArray
@@ -1088,6 +1097,62 @@ console.log(joinedCombinations);
         });
         console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
         // Update the state (using setCivilCom) instead of directly modifying civil_com
+        // updateCombinations = (prevState, idx, combinationName, vCOMB) => {
+        //   // Define newAssign (same as in setCivilCom)
+        //   let newAssign = { ...prevState.Assign };
+          
+        //   // Update newAssign as before
+        //   newAssign[`${idx + 1}`] = {
+        //     "NAME": combinationName,
+        //     "ACTIVE": "ACTIVE",
+        //     "bCB": false,
+        //     "iTYPE": 0,
+        //     "vCOMB": vCOMB
+        //   };
+        // }
+        setCivilCom(prevState => {
+          let newAssign = { ...prevState.Assign };
+          newAssign[`${idx + 1}`] = {
+            "NAME": combinationName,
+            "ACTIVE": "ACTIVE",
+            "bCB": false,
+            "iTYPE": 0,
+            "vCOMB": vCOMB
+          };
+        
+          return { ...prevState, Assign: newAssign };
+        });
+      });
+      
+      console.log(civilCom);
+      console.log("update_combo",updateCombinations);
+  }
+    if (type === "Either") {
+      const concatenatedArray = joinedCombinations.flat();
+      console.log(concatenatedArray);
+      concatenatedArray.forEach((combArray) => {
+        combArray.forEach(subArray => allFinalCombinations.push(subArray));
+      });
+    
+      // Now, iterate over allFinalCombinations to create and set vCOMB for each combination
+      allFinalCombinations.forEach((combArray, idx) => {
+        const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
+    
+        // Prepare the vCOMB structure for this combination
+        const vCOMB = combArray.map((comb) => {
+          // Search for the matching key in loadNames_key
+          const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
+          const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+          return {
+            "ANAL": analysisType,
+            "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
+            "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
+          };
+        });
+    
+        console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
+    
+        // Update the state (using setCivilCom) instead of directly modifying civil_com
         setCivilCom(prevState => {
           const newAssign = { ...prevState.Assign };
           newAssign[`${idx + 1}`] = {
@@ -1099,99 +1164,53 @@ console.log(joinedCombinations);
           };
           return { ...prevState, Assign: newAssign };
         });
-        console.log(civilCom);
       });
-
-      // API call
-      const civilComJson = JSON.stringify(civilCom, null, 2);
-      console.log(civilComJson);  // This ensures that the JSON is correctly formatted with commas
-      try {
-        // Determine the endpoint based on the selectedDropListValue
-        let endpoint = '';
-        switch (selectedDropListValue) {
-          case 1:
-            endpoint = '/db/lcom-steel';
-            break;
-          case 2:
-            endpoint = '/db/lcom-conc';
-            break;
-          case 3:
-            endpoint = '/db/lcom-src';
-            break;
-          case 4:
-            endpoint = '/db/lcom-stlcomp';
-            break;
-          default:
-            console.error("Invalid selectedDropListValue:", selectedDropListValue);
-            return; // Exit the function if the value is invalid
-        }
-      
-        // Make the POST request to the determined endpoint
-        const response = await midasAPI("POST", endpoint, civilCom);
-        console.log(response);
-      
-        // Check if the specific endpoint response exists in the response object
-        if (response && response[endpoint]) {
-          enqueueSnackbar("Load-Combination Generated Successfully", {
-            variant: "success",
-            anchorOrigin: {
-              vertical: "top",
-              horizontal: "center",
-            }
-          });
-        } else {
-          enqueueSnackbar("Failed to Generate Load-Combination", {
-            variant: "error",
-            anchorOrigin: {
-              vertical: "top",
-              horizontal: "center",
-            }
-          });
-        }
-      
-      } catch (error) {
-        console.error("Error generating load combination:", error);
-        enqueueSnackbar("An error occurred while generating Load-Combination", {
-          variant: "error",
-          anchorOrigin: {
-            vertical: "top",
-            horizontal: "center",
-          }
-        });
-      }
-      
-  }
-    if (type === "either") {
-      const concatenatedArray = joinedCombinations.flat();
-      console.log(concatenatedArray);
-      concatenatedArray.forEach((combArray, idx) => {
-        const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
-        const vCOMB = combArray.map((comb) => ({
-          "ANAL": "ST", // Assuming "RS" is the analysis type, you can replace it if needed
-          "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
-          "FACTOR": comb.sign * comb.factor // Assuming comb has properties `sign` and `factor`
-        }));
-
-        // Update the state (using setCivilCom) for the "either" type as well
-        setCivilCom(prevState => {
-          const newAssign = { ...prevState.Assign };
-          newAssign[`${idx + 1}`] = {
-            "NAME": combinationName,
-            "KIND": "GEN",
-            "ACTIVE": "INACTIVE",
-            "iTYPE": 0,
-            "DESC": "desc",
-            "vCOMB": vCOMB
-          };
-          return { ...prevState, Assign: newAssign };
-        });
-      });
+    
       console.log(civilCom);
     }
+    if (values["Generate envelop load combinations in midas"]) {
+      console.log("Generating envelope load combinations...");
+    
+      const combinationName = `${comb_name}_Env`;
+      let allVCombEntries = [];
+    
+      // Loop through each combination entry in civilCom.Assign
+      for (const key in civilCom.Assign) {
+        const assignEntry = civilCom.Assign[key];
+        if (assignEntry) {
+          // Extract the name part before the underscore
+          
+          const vCombObject = {
+            "ANAL": assignEntry.vCOMB[0]?.ANAL || "ST",  // Using ANAL from the first entry in vCOMB if available, else default to "ST"
+            "LCNAME": assignEntry.NAME,  // Storing just the base name (before the underscore)
+            "FACTOR": 1
+          };
+          allVCombEntries.push(vCombObject);
+        }
+      }
+      setCivilCom(prevState => {
+        const newAssign = { ...prevState.Assign };
+        newAssign[combinationName] = {
+          "NAME": combinationName,
+          "KIND": "GEN",
+          "ACTIVE": "INACTIVE",
+          "iTYPE": 0,
+          "vCOMB": allVCombEntries
+        };
+        return { ...prevState, Assign: newAssign };
+      });
+    
+      console.log(`Created envelope combination: ${combinationName}`, civilCom);
+    } 
   }
+ 
   console.log(allFinalCombinations);
   return allFinalCombinations;
 }
+
+console.log("Civil",civilCom);
+
+
 function join_factor(finalCombinations_sign) {
   // Helper function to recursively flatten nested arrays
   const deepFlatten = (arr) => {
@@ -1813,74 +1832,6 @@ console.log(joinedCombinations);
       // Push the flattened array to joinArray
       joinArray.push(flattenedAddJoin);
     }
-    // if (envelope.length === 0 && add.length > 0) {
-    //   const combined = [];
-      
-    //   for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
-    //     for (let i = 0; i < 5; i++) {
-    //       let allCombinations = [];
-    //       let shouldBreak = false; // Flag to determine whether to break the outer loop
-    
-    //       add.forEach(addArray => {
-    //         // Variable to hold combinations for each addArray separately
-    //         let subArrayCombination = [];
-    
-    //         if (Array.isArray(addArray) && addArray.length > 0) {
-    //           addArray.forEach(item => {
-    //             Object.keys(item).forEach(key => {
-    //               const value = item[key];
-    //               const loadCaseName = value.loadCaseName;
-    //               const sign = value.sign;
-    //               const factor = value.factor[factorIndex];
-    //               let factorValue;
-    
-    //               if (Array.isArray(factor)) {
-    //                 factorValue = getSingleFactor(factor, factorIndex, i);
-    //               } else {
-    //                 factorValue = factor;
-    //               }
-    
-    //               // Check if factorValue is valid and non-zero, then push it into subArrayCombination
-    //               if (factorValue !== undefined && factorValue !== 0) {
-    //                 const combinedResult = { loadCaseName, sign, factor: factorValue };
-    //                 subArrayCombination.push(combinedResult);
-    
-    //                 if (!Array.isArray(factor)) {
-    //                   // Set the flag to true for non-array factors and exit inner loops
-    //                   shouldBreak = true;
-    //                   return; // Exit the innermost loop
-    //                 }
-    //               }
-    //             });
-    //           });
-    //         }
-    
-    //         // After processing the entire addArray, add subArrayCombination to allCombinations
-    //         if (subArrayCombination.length > 0) {
-    //           allCombinations.push(subArrayCombination);
-    //         }
-    
-    //         if (shouldBreak) {
-    //           return; // Break out of the forEach loop as well
-    //         }
-    //       });
-    
-    //       // Push allCombinations to combined if it has entries
-    //       if (allCombinations.length > 0) {
-    //         combined.push(allCombinations);
-    //       }
-    
-    //       if (shouldBreak) {
-    //         break; // Break out of the 'i' loop
-    //       }
-    //     }
-    //   }
-    //   addJoin.push(...combined);
-    //   const flattenedAddJoin = addJoin.flat(1); // Flatten by one level
-      
-    //   // Push the flattened array to joinArray
-    //   joinArray.push(flattenedAddJoin);
-    // }
   }
   console.log("Extracted Factors Store: ", extractedFactorsStore);
   return joinArray;
@@ -2183,132 +2134,8 @@ function permutation_sign(result11) {
   console.log({ addObj, eitherArray, envelopeObj });
   return { addObj, eitherArray,envelopeObj };
 }
-// function permutation_sign(result11) {
-//   const { addObj, eitherArray, envelopeObj } = result11;
-//   let finalCombinations = [];
 
-//   function generateCombinations(arrays) {
-//     const results = [];
-//     function recurse(currentCombo, depth) {
-//       if (depth === arrays.length) {
-//         results.push([...currentCombo]);
-//         return;
-//       }
-//       for (let i = 0; i < arrays[depth].length; i++) {
-//         currentCombo.push(arrays[depth][i]);
-//         recurse(currentCombo, depth + 1);
-//         currentCombo.pop();
-//       }
-//     }
-//     recurse([], 0);
-//     return results;
-//   }
-
-//   // Process addObj, eitherArray, and envelopeObj
-//   const objectsToProcess = [addObj, eitherArray, envelopeObj];
-
-//   for (const objGroup of objectsToProcess) {
-//     if (!objGroup) continue; // Skip undefined objects
-
-//     for (let arrIndex = 0; arrIndex < objGroup.length; arrIndex++) {
-//       let array = objGroup[arrIndex];
-      
-//       for (let innerArrIndex = 0; innerArrIndex < array.length; innerArrIndex++) {
-//         let innerArr = array[innerArrIndex];
-        
-//         for (let objIndex = 0; objIndex < innerArr.length; objIndex++) {
-//           let obj = innerArr[objIndex];
-//           let positiveArray = [];
-//           let negativeArray = [];
-//           let dummyArray = [];
-//           let dummy = [];
-//           let new_temp = [];
-//           let temp = [];
-
-//           for (const item of obj) {
-//             dummy = [];
-//             if (item.sign === "+,-" || item.sign === "-,+") {
-//               const positiveObj = { ...item, sign: "+" };
-//               const negativeObj = { ...item, sign: "-" };
-//               positiveArray.push(positiveObj);
-//               negativeArray.push(negativeObj);
-//             } else if (item.sign === "±") {
-//               const positiveObj = { ...item, sign: "+" };
-//               const negativeObj = { ...item, sign: "-" };
-//               dummy.push(positiveObj);
-//               dummy.push(negativeObj);
-//               dummyArray.push(dummy);
-//             } else {
-//               new_temp.push({ ...item });
-//             }
-//           }
-
-//           if (dummyArray.length > 0) {
-//             const combinations = generateCombinations(dummyArray);
-//             if (positiveArray.length > 0 && negativeArray.length > 0) {
-//               for (const combination of combinations) {
-//                 const combinedWithPositive = [...positiveArray, ...combination];
-//                 const combinedWithNegative = [...negativeArray, ...combination];
-
-//                 if (new_temp.length > 0) {
-//                   for (const newItem of new_temp) {
-//                     const newItemArray = Array.isArray(newItem) ? newItem : [newItem];
-//                     temp.push([...combinedWithPositive, ...newItemArray]);
-//                     temp.push([...combinedWithNegative, ...newItemArray]);
-//                   }
-//                 } else {
-//                   temp.push(combinedWithPositive);
-//                   temp.push(combinedWithNegative);
-//                 }
-//               }
-//             } else {
-//               for (const combination of combinations) {
-//                 if (new_temp.length > 0) {
-//                   for (const newItem of new_temp) {
-//                     temp.push([...combination, ...newItem]);
-//                   }
-//                 } else {
-//                   temp.push(combination);
-//                 }
-//               }
-//             }
-//           } else {
-//             if (new_temp.length > 0) {
-//               for (const newItem of new_temp) {
-//                 if (positiveArray.length > 0 && negativeArray.length > 0) {
-//                   temp.push([...positiveArray, ...newItem]);
-//                   temp.push([...negativeArray, ...newItem]);
-//                 } else {
-//                   temp.push(newItem);
-//                 }
-//               }
-//             } else {
-//               if (positiveArray.length > 0) {
-//                 temp.push([...positiveArray]);
-//               }
-//               if (negativeArray.length > 0) {
-//                 temp.push([...negativeArray]);
-//               }
-//             }
-//           }
-
-//           if (temp.length === 0) {
-//             innerArr.splice(objIndex, 1); // Remove the empty obj from innerArr
-//             objIndex--; // Adjust the index after removal to avoid skipping elements
-//           } else {
-//             obj.length = 0;
-//             obj.push(...temp); // Push modified combinations to obj
-//           }
-//         }
-//       }
-//     }
-//   }
-
-//   console.log({ addObj, eitherArray, envelopeObj });
-//   return { addObj, eitherArray, envelopeObj };
-// }
-
-function Generate_Load_Combination() {
+async function Generate_Load_Combination() {
   const uniqueFactorData = removeDuplicateFactors(loadCombinations);
   setLoadCombinations(uniqueFactorData);
   console.log(uniqueFactorData);
@@ -2316,6 +2143,76 @@ function Generate_Load_Combination() {
   const basicCombinations = generateBasicCombinations(loadCombinations);
   console.log(basicCombinations);
 }
+const generateEnvelopeLoadCombination = async () => {
+  // Check if civilCom.Assign has any entries
+  if (Object.keys(civilCom.Assign).length === 0) {
+    console.log("civilCom.Assign is empty, no combinations to process.");
+    return; // Exit the function if Assign is empty
+  }
+
+   
+  const civilComJson = JSON.stringify(civilCom, null, 2);
+  console.log(civilComJson);
+  console.log(civilCom);
+  try {
+    // Determine the endpoint based on the selectedDropListValue
+    let endpoint = '';
+    switch (selectedDropListValue) {
+      case 1:
+        endpoint = '/db/lcom-steel';
+        break;
+      case 2:
+        endpoint = '/db/lcom-conc';
+        break;
+      case 3:
+        endpoint = '/db/lcom-src';
+        break;
+      case 4:
+        endpoint = '/db/lcom-stlcomp';
+        break;
+      default:
+        console.error("Invalid selectedDropListValue:", selectedDropListValue);
+        return; // Exit the function if the value is invalid
+    }
+
+    // Make the POST request to the determined endpoint
+    const response = await midasAPI("POST", endpoint, civilComJson);
+    console.log(response);
+
+    if (response && response[endpoint]) {
+      enqueueSnackbar("Load-Combination Generated Successfully", {
+        variant: "success",
+        anchorOrigin: {
+          vertical: "top",
+          horizontal: "center",
+        }
+      });
+    } else {
+      enqueueSnackbar("Failed to Generate Load-Combination", {
+        variant: "error",
+        anchorOrigin: {
+          vertical: "top",
+          horizontal: "center",
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error generating load combination:", error);
+    enqueueSnackbar("An error occurred while generating Load-Combination", {
+      variant: "error",
+      anchorOrigin: {
+        vertical: "top",
+        horizontal: "center",
+      }
+    });
+  }
+};
+
+// Call the function when needed, for example:
+if (Object.keys(civilCom.Assign).length > 0) {
+  generateEnvelopeLoadCombination();
+}
+
 const toggleExcelReader = () => {
   fileInputRef.current.click();
 };
@@ -2368,7 +2265,7 @@ useEffect(() => {
 const removeDuplicateFactors = (data) => {
   return data.map((combination) => {
     // Only process loadCases if type is "Either"
-    if (combination.type === "Either") {
+    if (combination.type === "Either" || combination.type === "Envelope") {
       const updatedLoadCases = combination.loadCases.map((loadCase) => {
         const factors = [
           loadCase.factor1,
@@ -2401,6 +2298,7 @@ const removeDuplicateFactors = (data) => {
     return combination;
   });
 };
+
 
 const handleFileChange = (event) => {
   const file = event.target.files[0];
@@ -2563,6 +2461,16 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   // }, []);
   
   //Main UI
+  
+
+  // Handle checkbox changes by updating the state
+  const handleCheckboxChange = (e, checked) => {
+    const event = e;
+    setValues((prevValues) => ({
+      ...prevValues,
+      [event.target.name]: checked,
+    }));
+  };
   return (
 	<div className="App" >
     {showDialog && <VerifyDialog />}
@@ -2704,10 +2612,10 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
               </Scrollbars>
       </div>
       
-    <CheckGroup>
-  <Check name="Generate envelop load combinations in midas" />
-  <Check name="Generate inactive load combinations in midas" />
-</CheckGroup>
+      <CheckGroup>
+        <Check name="Generate envelop load combinations in midas" checked={values.test1} onChange={handleCheckboxChange} />
+        <Check name="Generate inactive load combinations in midas" checked={values.test2} onChange={handleCheckboxChange} />
+      </CheckGroup>
 <ComponentsPanelTypographyDropList 
           selectedValue={selectedDropListValue} 
           onValueChange={handleDropListChange} 
@@ -2825,9 +2733,68 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   </Panel>
       <div style={{  width: '780px', height: '25px', display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly', backgroundColor: 'white', padding: '10px'}}>
       {/* {Buttons.SubButton("contained", "Import Load Cases", Import_Load_Cases)} */}
-      {Buttons.SubButton("contained", "Export Load Combination",exportToExcel)}
-      {Buttons.SubButton("contained", "Import Load Combination",toggleExcelReader)}
-      {Buttons.SubButton("contained", "Generate Load Combination",Generate_Load_Combination)}
+      {/* {!exportLoading || !importLoading || !generateLoading ? (
+          <>
+        {Buttons.SubButton("contained", "Export Load Combination", exportToExcel,exportLoading)}
+        {Buttons.SubButton("contained", "Import Load Combination", toggleExcelReader,importLoading)}
+        {Buttons.SubButton("contained", "Generate Load Combination", Generate_Load_Combination,generateLoading)}
+          </>
+        ) : (
+          // Show the loading buttons when clicked
+          <>
+            <ComponentsButtonLoading
+              types="contained"
+              texts="Export Load Combination"
+              clickevent={exportToExcel}
+              loading={exportLoading}
+            />
+            <ComponentsButtonLoading
+              types="contained"
+              texts="Import Load Combination"
+              clickevent={toggleExcelReader}
+              loading={importLoading}
+            />
+            <ComponentsButtonLoading
+              types="contained"
+              texts="Generate Load Combination"
+              clickevent={Generate_Load_Combination}
+              loading={generateLoading}
+            />
+          </>
+        )} */}
+       {!exportLoading ? (
+  Buttons.SubButton("contained", "Export Load Combination", exportToExcel, exportLoading)
+) : (
+  <ComponentsButtonLoading
+    types="contained"
+    texts="Export Load Combination"
+    clickevent={exportToExcel}
+    loading={exportLoading}
+  />
+)}
+
+{!importLoading ? (
+  Buttons.SubButton("contained", "Import Load Combination", toggleExcelReader, importLoading)
+) : (
+  <ComponentsButtonLoading
+    types="contained"
+    texts="Import Load Combination"
+    clickevent={toggleExcelReader}
+    loading={importLoading}
+  />
+)}
+
+{!generateLoading ? (
+  Buttons.SubButton("contained", "Generate Load Combination", Generate_Load_Combination, generateLoading)
+) : (
+  <ComponentsButtonLoading
+    types="contained"
+    texts="Generate Load Combination"
+    clickevent={Generate_Load_Combination}
+    loading={generateLoading}
+  />
+)}
+
       </div>
       <ExcelReader onImport={importLoadCombinationInput} handleFileChange={handleFileChange} />
       <input
