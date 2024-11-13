@@ -283,100 +283,6 @@ function importLoadCombinationInput(data) {
     setSelectedLoadCombinationIndex(index);
   };
   console.log(selectedDropListValue);
-  // const exportToExcel = () => {
-  //   console.log(loadNames);
-  //   console.log(civilCom);
-  //   console.log(loadCombinations);
-  //   loadNames = Array.from(new Set(loadNames));
-  //   console.log(loadNames);
-  //   // Function to convert column index to Excel column letter (e.g., 3 -> "D")
-  //   // const getColumnLetter = (colIndex) => {
-  //   //   let letter = '';
-  //   //   while (colIndex >= 0) {
-  //   //     letter = String.fromCharCode((colIndex % 26) + 65) + letter;
-  //   //     colIndex = Math.floor(colIndex / 26) - 1;
-  //   //   }
-  //   //   return letter;
-  //   // };
-  
-  //   const workbook = new ExcelJS.Workbook();
-  
-  //   // Add a new worksheet to the workbook
-  //   const worksheet = workbook.addWorksheet('Load Combinations');
-  
-  //   // Add headers to the first row
-  //   // worksheet.getCell('A1').value = 'Name';
-  //   // worksheet.getCell('B1').value = 'Active';
-  //   // worksheet.getCell('C1').value = 'Type';
-  
-  //   // // Gather all unique LCNAMEs
-  //   // let lcNames = new Set();
-  //   // Object.keys(civilCom.Assign).forEach((key) => {
-  //   //   const combination = civilCom.Assign[key];
-  //   //   combination.vCOMB.forEach((item) => {
-  //   //     lcNames.add(item.LCNAME); // Add unique LCNAMEs to the set
-  //   //   });
-  //   // });
-  
-  //   // Convert lcNames Set to Array for easy iteration
-  //   // lcNames = Array.from(lcNames);
-  
-  //   // Add LCNAME headers to the first row starting from column D
-  //   // lcNames.forEach((lcname, index) => {
-  //   //   const columnLetter = getColumnLetter(3 + index); // Starting from "D" (index 3)
-  //   //   worksheet.getCell(`${columnLetter}1`).value = lcname; // Place each LCNAME in row 1 across columns
-  //   // });
-  
-  //   // Add loadNames headers to the first row starting after LCNAME columns
-  //   // loadNames.forEach((name, index) => {
-  //   //   const columnLetter = getColumnLetter(3 + index); // Adjust column for loadNames
-  //   //   worksheet.getCell(`${columnLetter}1`).value = name; // Place each loadName in row 1
-  //   // });
-  
-  //   // // Iterate over Assign object and add the NAME, ACTIVE, and FACTOR values
-  //   // let rowIndex = 2; // Start from row 2 (since row 1 is for headers)
-  //   // Object.keys(civilCom.Assign).forEach((key) => {
-  //   //   const combination = civilCom.Assign[key];
-  //   //   const name = combination.NAME;
-  //   //   const active = combination.ACTIVE;
-  //   //   const type = combination.iTYPE;
-  
-  //   //   // Set the NAME, ACTIVE, and TYPE values in columns A, B, and C
-  //   //   worksheet.getCell(`A${rowIndex}`).value = name;
-  //   //   worksheet.getCell(`B${rowIndex}`).value = active;
-  //   //   worksheet.getCell(`C${rowIndex}`).value = type;
-  
-  //   //   // Iterate through vCOMB to set the FACTOR values for each LCNAME
-  //   //   combination.vCOMB.forEach((item) => {
-  //   //     const lcname = item.LCNAME;
-  //   //     const factor = item.FACTOR;
-  
-  //   //     // Check if the LCNAME is in the loadNames array
-  //   //     const loadNameIndex = loadNames.indexOf(lcname);
-  //   //     if (loadNameIndex !== -1) {
-  //   //       // Find the correct column for this loadName in the worksheet
-  //   //       const columnIndex = 3 + loadNameIndex; // Adjust column based on lcNames and loadNames
-  //   //       const columnLetter = getColumnLetter(columnIndex);
-          
-  //   //       // Set the factor in the correct cell for the current row
-  //   //       worksheet.getCell(`${columnLetter}${rowIndex}`).value = factor;
-  //   //     }
-  //   //   });
-  
-  //   //   // Increment rowIndex for the next row
-  //   //   rowIndex++;
-  //   // });
-  
-  //   // Write the workbook to a buffer and save it as an Excel file
-  //   workbook.xlsx.writeBuffer()
-  //     .then((buffer) => {
-  //       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  //       saveAs(blob, 'Load_Combination_Input.xlsx'); // Save the file to the user's system
-  //     })
-  //     .catch((err) => {
-  //       console.error('Error creating Excel file:', err);
-  //     });
-  // };
   const exportToExcel = () => {
     setExportLoading(true);
     try {
@@ -497,7 +403,7 @@ function createCombinations(loadCases, strengthCombination, combinations, loadNa
       const factorKey = `factor${i}`;
       let multipliedFactor = loadCases[factorKey] * value;
       if (i === factor) {
-        multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 0;
+        multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 1;
       }
  if (dimension === 1) {
   // In 1D array, we simply set the value at the first index
@@ -531,7 +437,12 @@ else if (dimension > 2) {
       sign: sign,
       factor: factorArray
     };
-    result.push(loadCaseObj);
+    if (!result["Add"]) {
+      result["Add"] = [];
+    }
+    
+    // Push the new loadCaseObj into the 'Add' array
+    result["Add"].push(loadCaseObj);
   } else {
     const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
     const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
@@ -823,7 +734,7 @@ function combineAddEither(inputObj) {
             subArrayOrItem.forEach((item) => {
               if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
                 // Check if the item has 'Add' or 'Either' and make the recursive call if needed
-                if (item.Add || item.Either) {
+                if (item.Add || item.Either || item.Envelope) {
                   processKeyValuePairs(item, parentKey); // Recursive call for nested 'Add' or 'Either'
                 } else {
                   // Directly push the item if it doesn't have 'Add' or 'Either'
@@ -888,7 +799,8 @@ function multipleFactor(input) {
           let temp = []; 
           if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
               Object.keys(item).forEach((key) => {
-                  // Extract loadCaseName, sign, and factor properties
+                if (!isNaN(Number(key))) {
+                  // Extract loadCaseName, sign, and factor properties if the key is a number
                   if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
                       loadCaseNames.push(item[key].loadCaseName);
                       temp.push({
@@ -897,6 +809,25 @@ function multipleFactor(input) {
                           factor: item[key].factor,
                       });
                   }
+              } else {
+                if (item.loadCaseName && item.sign && item.factor) {
+                  // Check if item.factor is an array
+                  if (Array.isArray(item.factor)) {
+                      // Iterate over each value in the factor array
+                      item.factor = item.factor.map(value => {
+                          // If value is NaN, replace it with undefined
+                          return isNaN(value) ? undefined : value;
+                      });
+                  }
+                  
+                  // Now push the item to temp
+                  temp.push({
+                      loadCaseName: item.loadCaseName,
+                      sign: item.sign,
+                      factor: item.factor,
+                  });
+              }
+              }
               });
           }
           tempArray.push(temp);
@@ -997,9 +928,13 @@ async function generateBasicCombinations(loadCombinations) {
     console.error("No combinations with active set to 'Strength' found.");
     return [];
   }
-  const allFinalCombinations = [];
+  let allFinalCombinations = [];
+  let combinationCounter = 0; 
+  let backupCivilCom = { Assign: {} };
   // Iterate over each strengthCombination
   for (const strengthCombination of strengthCombinations) {
+    combinationCounter =  combinationCounter + allFinalCombinations.length;
+    allFinalCombinations = [];
     const comb_name = strengthCombination.loadCombination;
     const type = strengthCombination.type;
     
@@ -1019,7 +954,7 @@ async function generateBasicCombinations(loadCombinations) {
           factors.push({ factor, value: 1 });
         }
         // Check if all factors are undefined, and if so, set factor1 to 1
-        const allFactorsUndefined = factors.every(f => f.value === undefined);
+        const allFactorsUndefined = factors.every(f => f.value === undefined || f.value === "");
         if (allFactorsUndefined) {
           const factor1 = factors.find(f => f.factor === 1);
           if (factor1) {
@@ -1031,7 +966,7 @@ async function generateBasicCombinations(loadCombinations) {
       console.log(factors);
         const factorObject = factors.find(f => f.factor === factor);
         // Check if the factor value is defined
-        if (factorObject && factorObject.value !== undefined) {
+        if (factorObject && factorObject.value !== undefined  && factorObject.value !== "") {
           const new_11 = createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor, sign);
           console.log(new_11);
           // Combine and permute the results
@@ -1057,7 +992,7 @@ for (const subArray of factorArray) {
   joinedCombinations.push(joinedResult);
 }
 console.log(joinedCombinations);
-let updateCombinations = [];
+
     if (type === 'Add') {
       let joinedComb = [];
       // Recursive helper function to generate combinations from joinArray
@@ -1082,6 +1017,7 @@ let updateCombinations = [];
       joinedComb = []
       } 
     }
+   
       allFinalCombinations.forEach((combArray, idx) => {
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
         // Prepare the vCOMB structure for this combination
@@ -1096,36 +1032,19 @@ let updateCombinations = [];
           };
         });
         console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
-        // Update the state (using setCivilCom) instead of directly modifying civil_com
-        // updateCombinations = (prevState, idx, combinationName, vCOMB) => {
-        //   // Define newAssign (same as in setCivilCom)
-        //   let newAssign = { ...prevState.Assign };
-          
-        //   // Update newAssign as before
-        //   newAssign[`${idx + 1}`] = {
-        //     "NAME": combinationName,
-        //     "ACTIVE": "ACTIVE",
-        //     "bCB": false,
-        //     "iTYPE": 0,
-        //     "vCOMB": vCOMB
-        //   };
-        // }
-        setCivilCom(prevState => {
-          let newAssign = { ...prevState.Assign };
-          newAssign[`${idx + 1}`] = {
-            "NAME": combinationName,
-            "ACTIVE": "ACTIVE",
-            "bCB": false,
-            "iTYPE": 0,
-            "vCOMB": vCOMB
-          };
-        
-          return { ...prevState, Assign: newAssign };
-        });
-      });
+        backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
+          "NAME": combinationName,
+          "ACTIVE": "ACTIVE",
+          "bCB": false,
+          "iTYPE": 0,
+          "vCOMB": vCOMB
+      };
       
-      console.log(civilCom);
-      console.log("update_combo",updateCombinations);
+      // Then, update the state with setCivilCom
+      setCivilCom({ Assign: { ...backupCivilCom.Assign } });
+        console.log(`Created envelope combination: ${combinationName}`, civilCom);  
+        console.log("Backup CivilCom:", backupCivilCom);
+      });
   }
     if (type === "Either") {
       const concatenatedArray = joinedCombinations.flat();
@@ -1136,10 +1055,10 @@ let updateCombinations = [];
     
       // Now, iterate over allFinalCombinations to create and set vCOMB for each combination
       allFinalCombinations.forEach((combArray, idx) => {
+        combinationCounter++;
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
-    
         // Prepare the vCOMB structure for this combination
-        const vCOMB = combArray.map((comb) => {
+        let vCOMB = combArray.map((comb) => {
           // Search for the matching key in loadNames_key
           const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
           const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
@@ -1149,34 +1068,30 @@ let updateCombinations = [];
             "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
           };
         });
-    
         console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
-    
-        // Update the state (using setCivilCom) instead of directly modifying civil_com
-        setCivilCom(prevState => {
-          const newAssign = { ...prevState.Assign };
-          newAssign[`${idx + 1}`] = {
-            "NAME": combinationName,
-            "ACTIVE": "ACTIVE",
-            "bCB": false,
-            "iTYPE": 0,
-            "vCOMB": vCOMB
-          };
-          return { ...prevState, Assign: newAssign };
-        });
+        backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
+          "NAME": combinationName,
+          "ACTIVE": "ACTIVE",
+          "bCB": false,
+          "iTYPE": 0,
+          "vCOMB": vCOMB
+      };
+      
+      // Then, update the state with setCivilCom
+      setCivilCom({ Assign: { ...backupCivilCom.Assign } });
+        console.log(`Created envelope combination: ${combinationName}`, civilCom);
+        console.log("Backup CivilCom:", backupCivilCom);
       });
-    
-      console.log(civilCom);
     }
     if (values["Generate envelop load combinations in midas"]) {
       console.log("Generating envelope load combinations...");
     
       const combinationName = `${comb_name}_Env`;
       let allVCombEntries = [];
-    
+      console.log("BACKUP",backupCivilCom);
       // Loop through each combination entry in civilCom.Assign
-      for (const key in civilCom.Assign) {
-        const assignEntry = civilCom.Assign[key];
+      for (const key in backupCivilCom.Assign) {
+        const assignEntry = backupCivilCom.Assign[key];
         if (assignEntry) {
           // Extract the name part before the underscore
           
@@ -1209,7 +1124,6 @@ let updateCombinations = [];
 }
 
 console.log("Civil",civilCom);
-
 
 function join_factor(finalCombinations_sign) {
   // Helper function to recursively flatten nested arrays
@@ -1283,6 +1197,7 @@ function join_factor(finalCombinations_sign) {
               flattenedAddObj.push([...deepFlatten(combinedArray)]);
               combinedArray = [];
             } else {
+              if (currentArray.length > 0) {
               const length = currentArray[0].length;
               for (let i = 0; i < length; i++) {
                 let combinedArray = [];
@@ -1297,20 +1212,25 @@ function join_factor(finalCombinations_sign) {
                 combinedArray = [];
               }
             }
+            }
           } else {
             mainArray.forEach(currentArray => {
-              const length = currentArray[0].length;
-              for (let i = 0; i < length; i++) {
-                let combinedArray = [];
-                currentArray.forEach(subArray => {
-                  if (Array.isArray(subArray) && subArray[i]) {
-                    combinedArray.push(subArray[i]);
-                  }
-                });
-                flattenedAddObj.push([...deepFlatten(combinedArray)]);
-                combinedArray = [];
+              // Check if the currentArray has any elements before proceeding
+              if (currentArray.length > 0) {
+                const length = currentArray[0].length;
+                for (let i = 0; i < length; i++) {
+                  let combinedArray = [];
+                  currentArray.forEach(subArray => {
+                    if (Array.isArray(subArray) && subArray[i]) {
+                      combinedArray.push(subArray[i]);
+                    }
+                  });
+                  flattenedAddObj.push([...deepFlatten(combinedArray)]);
+                  combinedArray = [];
+                }
               }
             });
+            
           }
         }
       });
@@ -1466,8 +1386,8 @@ function join(factorCombinations) {
       }
       extractedFactorsStore[factorIndex][i] = extractedFactors;
       function generateCombinations(arrays, temp = [], index = 0) {
-        const filteredArrays = arrays.filter(array => Array.isArray(array) && array.length > 0);
-        if (index === filteredArrays.length) {
+        // const filteredArrays = arrays.filter(array => Array.isArray(array) && array.length > 0);
+        if (index === arrays.length) {
           combinedResult.push([...temp]);
           return;
         }
@@ -2197,14 +2117,14 @@ const generateEnvelopeLoadCombination = async () => {
       });
     }
   } catch (error) {
-    console.error("Error generating load combination:", error);
-    enqueueSnackbar("An error occurred while generating Load-Combination", {
-      variant: "error",
-      anchorOrigin: {
-        vertical: "top",
-        horizontal: "center",
-      }
-    });
+    // console.error("Error generating load combination:", error);
+    // enqueueSnackbar("An error occurred while generating Load-Combination", {
+    //   variant: "error",
+    //   anchorOrigin: {
+    //     vertical: "top",
+    //     horizontal: "center",
+    //   }
+    // });
   }
 };
 
@@ -2216,14 +2136,16 @@ if (Object.keys(civilCom.Assign).length > 0) {
 const toggleExcelReader = () => {
   fileInputRef.current.click();
 };
-const [loadCombinations, setLoadCombinations] = useState([{ loadCombination: '', active: '', type: '', loadCases: [{
-  loadName: '',
-  sign: '',
-  factor1: '',
-  factor2: '',
-  factor3: '',
-  factor4: '',
-  factor5: ''
+const [loadCombinations, setLoadCombinations] = useState(
+  [
+    { loadCombination: '', active: '', type: '', loadCases: [{
+              loadName: '',
+              sign: '',
+              factor1: '',
+              factor2: '',
+              factor3: '',
+              factor4: '',
+              factor5: ''
 }]}]);
 useEffect(() => {
   // Ensure there is always an additional empty row at the end
@@ -2233,7 +2155,7 @@ useEffect(() => {
     lastCombination.active !== '' || 
     lastCombination.type !== '' || 
     lastCombination.loadCases.some(loadCase => (
-      loadCase.loadName !== '' ||
+      loadCase.loadCaseName !== '' ||
       loadCase.sign !== '' ||
       loadCase.factor1 !== '' ||
       loadCase.factor2 !== '' ||                  
@@ -2249,7 +2171,7 @@ useEffect(() => {
         active: '',
         type: '',
         loadCases: [{
-          loadName: '',
+          loadCaseName: '',
           sign: '',
           factor1: '',
           factor2: '',
@@ -2413,54 +2335,37 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   }, []);
   console.log(loadNames);
   console.log(loadCombinations);
-  const handleAddLoadCase = () => {
-    console.log('selectedLoadCombinationIndex',selectedLoadCombinationIndex)
-    // addNewLoadCase(selectedLoadCombinationIndex);
+  function handleAddLoadCase() {
+    // Prevent multiple clicks within a short time
+    if (isAddingLoadCase) return;
+  
+    setIsAddingLoadCase(true);
+  
+    console.log('selectedLoadCombinationIndex', selectedLoadCombinationIndex);
+  
+    // Check if the selectedLoadCombinationIndex is valid
+    if (selectedLoadCombinationIndex >= 0 && selectedLoadCombinationIndex < loadCombinations.length) {
+      const newLoadCase = {                               
+        loadCaseName: "",
+        sign: "",
+        factor1: undefined,
+        factor2: undefined,
+        factor3: undefined,
+        factor4: undefined,
+        factor5: undefined
+      };
 
-    const newLoadCase = {
-      loadCaseName: "", 
-      sign: "",
-      factor1: undefined,
-      factor2: undefined,
-      factor3: undefined,
-      factor4: undefined,
-      factor5: undefined
-    };
-    setLoadCombinations((prevCombinations) => {
-      const updatedCombinations = [...prevCombinations];
+      let updatedCombinations = [...loadCombinations];
       updatedCombinations[selectedLoadCombinationIndex].loadCases.push(newLoadCase);
-      return updatedCombinations;
-    });
 
-    // setIsAddingLoadCase((prevAdding) => {
-    //   if (prevAdding) return; 
-    //   addNewLoadCase(selectedLoadCombinationIndex);
-    //   setTimeout(() => {
-    //     setIsAddingLoadCase(false);
-    //   }, 500);
+      setLoadCombinations(updatedCombinations);
+    } else {
+      console.error('Invalid selectedLoadCombinationIndex');
+    }
   
-    //   return true; 
-    // });
-  };
+    setIsAddingLoadCase(false); // Reset flag after some time
+  }
   
-  // const addNewLoadCase = useCallback((combinationIndex) => {
-  //   const newLoadCase = {
-  //     loadCaseName: "", 
-  //     sign: "",
-  //     factor1: undefined,
-  //     factor2: undefined,
-  //     factor3: undefined,
-  //     factor4: undefined,
-  //     factor5: undefined
-  //   };
-  //   setLoadCombinations((prevCombinations) => {
-  //     const updatedCombinations = [...prevCombinations];
-  //     updatedCombinations[combinationIndex].loadCases.push(newLoadCase);
-  //     return updatedCombinations;
-  //   });
-  // }, []);
-  
-  //Main UI
   
 
   // Handle checkbox changes by updating the state
@@ -2487,7 +2392,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
 </Typography></div>
          <div style={{ display: 'flex', flexDirection: 'row', backgroundColor: 'white', color: 'black',fontSize:'12px',width:'280px', height: '20px',borderTopLeftRadius: '10px', borderTopRightRadius: '10px'}}>
          {/* <Panel width="280px" height="20px" variant="shadow2"> */}
-         <div style={{ flex: '0 0 160px', paddingLeft:'2px' }}>Load Combination</div>
+         <div style={{ flex: '0 0 127px', paddingLeft:'2px' }}>Load Combination</div>
           <Sep direction='vertical' margin='2px'/>
          <div style={{ flex: '1 1 auto' }}>Active</div>
         <Sep direction='vertical' margin='2px'/>
@@ -2506,7 +2411,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
 
                {loadCombinations.map((combo, index) => (
       <div key={index} style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #ccc', cursor: 'pointer', backgroundColor: selectedLoadCombinationIndex === index ? '#f0f0f0' : 'white' }} onClick={() => handleLoadCombinationClick(index)}>
-        <div style={{ flex: '0 0 140px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}>
+        <div style={{ flex: '0 0 110px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}>
                       {index === loadCombinations.length - 1 ? (
                         <input
                           type="text"
@@ -2668,18 +2573,26 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
         >
           <Typography>{loadCase.loadCaseName}</Typography>
           {loadCaseDropdownIndex === loadCaseIndex && (
-            <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
-              {loadNames.map((name, nameIndex) => (
-                <div
-                  key={nameIndex}
-                  onClick={() => handleLoadCaseOptionSelect(selectedLoadCombinationIndex, loadCaseIndex, name)}
-                  style={{ padding: '5px', cursor: 'pointer', backgroundColor: name === loadCase.loadCaseName ? '#f0f0f0' : 'white' }}
-                >
-                  <Typography>{name}</Typography>
-                </div>
-              ))}
-            </div>
-          )}
+  <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
+    <Scrollbars height={150} width="100%"> {/* Applying the Scrollbars component */}
+      {/* <Stack spacing={1}> */}
+        {[
+          ...loadNames, 
+          ...loadCombinations.map((combination) => combination.loadCombination)
+        ].map((name, nameIndex) => (
+          <div
+            key={nameIndex}
+            onClick={() => handleLoadCaseOptionSelect(selectedLoadCombinationIndex, loadCaseIndex, name)}
+            style={{ padding: '5px', cursor: 'pointer', backgroundColor: name === loadCase.loadCaseName ? '#f0f0f0' : 'white' }}
+          >
+            <Typography>{name}</Typography>
+          </div>
+        ))}
+      {/* </Stack> */}
+    </Scrollbars>
+  </div>
+)}
+
         </div>
 
         {/* Dynamic Sign Dropdown */}
@@ -2719,13 +2632,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
       </div>
     ))}
     {/* {selectedLoadCombinationIndex >= 0 && ( */}
-    <button
-       onClick={handleAddLoadCase}
-       disabled={isAddingLoadCase}
-      style={{ margin: '10px', padding: '5px 10px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer' }}
-    >
-      Add Load Case
-    </button>
+    {Buttons.NodeButton("contained", "Add Load Case", handleAddLoadCase)}
   {/* )} */}
 </Scrollbars>
         </div>

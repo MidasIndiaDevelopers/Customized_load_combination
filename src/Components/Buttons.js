@@ -19,7 +19,7 @@ export function SubButton(types, texts, clickevent,loading) {
 
 export function NodeButton(types, texts, clickevent) {
   return (
-    <Stack spacing={2} direction="row">
+    <Stack spacing={2} direction="row" alignItems="center" justifyContent="center" style={{ width: '100%' , paddingTop: '10px'}}>
       <Button size="small" variant={types} onClick={clickevent}>{texts}</Button>
     </Stack>
   );
