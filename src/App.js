@@ -1031,7 +1031,7 @@ console.log(joinedCombinations);
             "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
           };
         });
-        console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
+        // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
         backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
           "NAME": combinationName,
           "ACTIVE": "ACTIVE",
@@ -1042,8 +1042,8 @@ console.log(joinedCombinations);
       
       // Then, update the state with setCivilCom
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
-        console.log(`Created envelope combination: ${combinationName}`, civilCom);  
-        console.log("Backup CivilCom:", backupCivilCom);
+        // console.log(`Created envelope combination: ${combinationName}`, civilCom);  
+        // console.log("Backup CivilCom:", backupCivilCom);
       });
   }
     if (type === "Either") {
@@ -1068,7 +1068,7 @@ console.log(joinedCombinations);
             "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
           };
         });
-        console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
+        // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
         backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
           "NAME": combinationName,
           "ACTIVE": "ACTIVE",
@@ -1079,8 +1079,8 @@ console.log(joinedCombinations);
       
       // Then, update the state with setCivilCom
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
-        console.log(`Created envelope combination: ${combinationName}`, civilCom);
-        console.log("Backup CivilCom:", backupCivilCom);
+        // console.log(`Created envelope combination: ${combinationName}`, civilCom);
+        // console.log("Backup CivilCom:", backupCivilCom);
       });
     }
     if (values["Generate envelop load combinations in midas"]) {
@@ -1088,7 +1088,7 @@ console.log(joinedCombinations);
     
       const combinationName = `${comb_name}_Env`;
       let allVCombEntries = [];
-      console.log("BACKUP",backupCivilCom);
+      // console.log("BACKUP",backupCivilCom);
       // Loop through each combination entry in civilCom.Assign
       for (const key in backupCivilCom.Assign) {
         const assignEntry = backupCivilCom.Assign[key];
@@ -1115,7 +1115,7 @@ console.log(joinedCombinations);
         return { ...prevState, Assign: newAssign };
       });
     
-      console.log(`Created envelope combination: ${combinationName}`, civilCom);
+      // console.log(`Created envelope combination: ${combinationName}`, civilCom);
     } 
   }
  
@@ -1440,6 +1440,7 @@ function join(factorCombinations) {
       const maxI = getMaxIValue(either, add);
       console.log(maxI);
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
+        console.log(factorIndex);
         for (let i = 0; i < maxI; i++) {
           const factorCombinations = combineMatchingFactors(either, factorIndex, i);
           console.log(factorCombinations);
@@ -1447,7 +1448,7 @@ function join(factorCombinations) {
           add.forEach(addArray => {
             if (Array.isArray(addArray) && addArray.length > 0) {
               factorCombinations.forEach(factorCombination => {
-                const combinedResult = [...factorCombination];
+                let combinedResult = []
                 const addresult = [];
                 addArray.forEach(item => {
                   Object.keys(item).forEach(key => {
@@ -1463,6 +1464,7 @@ function join(factorCombinations) {
                   });
                 });
                 if (combinedResult.length > 0) {
+                  combinedResult.push(...factorCombination);
                   allCombinations.push(combinedResult);
                 }
               });
@@ -1482,27 +1484,32 @@ function join(factorCombinations) {
 // console.log(mergeArray);
 const mergeArray = [];
 // Helper function to generate permutations
-function getCustomCombinations(arrays) {
+function getCustomCombinations(arrays,arrays_1) {
   const result = [];
-
+  const filteredArrays = arrays.filter(
+    arr => arr.some(subArray => subArray.length > 0)
+  );
+  const flatArrays1 = arrays_1.flat();
   function buildCombination(currentCombination, currentIndex) {
     // Base case: if we've built a combination using elements from all non-empty arrays, add it to the result
-    if (currentIndex === arrays.length) {
+    if (currentIndex === filteredArrays.length) {
       result.push([...currentCombination]);
       return;
     }
 
     // If the current array is empty, skip to the next one
-    if (arrays[currentIndex].length === 0) {
+    if (filteredArrays[currentIndex].length === 0) {
       buildCombination(currentCombination, currentIndex + 1);
       return;
     }
     if (currentIndex === 0) {
+      // currentCombination.push(filteredArrays[currentIndex]);
       // Iterate over the first array
-      arrays[currentIndex].forEach((subArray, index) => {
-        if (arrays[currentIndex + 1].length > 0) {
+      filteredArrays[currentIndex].forEach((subArray, index) => {
+        if (filteredArrays[currentIndex + 1] !==  undefined) {
           // Pair the subArray from the current index with the opposite element in the next array
-          const nextSubArray = arrays[currentIndex + 1][arrays[currentIndex + 1].length - 1 - index];
+          const nextSubArray = filteredArrays[currentIndex + 1][filteredArrays[currentIndex + 1].length - 1 - index];
+          
           currentCombination.push(subArray, nextSubArray); // Add both subarrays to the combination
           buildCombination(currentCombination, currentIndex + 2); // Skip to the next index
           currentCombination.pop(); // Backtrack to try the next combination
@@ -1513,6 +1520,11 @@ function getCustomCombinations(arrays) {
   }
   // Start the recursive process with an empty combination and from the first index
   buildCombination([], 0);
+  filteredArrays.forEach(filteredArray => {
+    if (JSON.stringify(filteredArray) !== JSON.stringify(flatArrays1)) {
+      result.push(filteredArray);
+    }
+  });
 
   return result;
 }
@@ -1527,6 +1539,7 @@ for (let j = 0; j < 5; j++) {
     const fixedElement = baseInnerArray[0]; // First element of i-th array for fixed position
     // Initialize elementsToPermute with rest of elements in the current i-th array
     let elementsToPermute = [baseInnerArray.slice(1)];
+    let elementsToPermute_first = [baseInnerArray.slice(1)];
     // Additional loop for other `i` values (0 to 4), except the current `i`
     for (let k = 0; k < 5; k++) {
       if (k === i) continue; // Skip the current i index to avoid repetition
@@ -1538,8 +1551,13 @@ for (let j = 0; j < 5; j++) {
     }
     // Generate permutations for elementsToPermute and merge with fixedElement
     console.log(elementsToPermute);
-    const permutations = getCustomCombinations(elementsToPermute);
-    console.log(permutations);
+    const permutations = getCustomCombinations(elementsToPermute,elementsToPermute_first);
+    // const cleanedPermutations = permutations.map(combination => {
+    //   // Filter out baseInnerArray.slice(1) from each combination
+    //   return combination.filter(subArray => JSON.stringify(subArray) !== JSON.stringify(baseInnerArray.slice(1)));
+    // });
+    
+    // console.log(cleanedPermutations);
     permutations.forEach(perm => {
       const mergedInnerArray = [fixedElement, ...perm];
       if (mergedInnerArray.every(el => el && el.length > 0)) {
@@ -1560,7 +1578,7 @@ console.log(mergeArray);
           return;
         }
         // Debugging statement to check what arrays[index] contains
-        console.log("Current index:", index, "arrays[index]:", arrays[index]);
+        // console.log("Current index:", index, "arrays[index]:", arrays[index]);
         // Check if arrays[index] is an array and is iterable
         if (Array.isArray(arrays[index])) {
           // Loop through each item in the current array at 'index'
@@ -2070,25 +2088,30 @@ const generateEnvelopeLoadCombination = async () => {
     return; // Exit the function if Assign is empty
   }
 
-   
+  // const node = 
   const civilComJson = JSON.stringify(civilCom, null, 2);
   console.log(civilComJson);
   console.log(civilCom);
   try {
     // Determine the endpoint based on the selectedDropListValue
     let endpoint = '';
+    let check = '';
     switch (selectedDropListValue) {
       case 1:
         endpoint = '/db/lcom-steel';
+        check = 'LCOM-STEEL';
         break;
       case 2:
         endpoint = '/db/lcom-conc';
+        check = 'LCOM-CONC';
         break;
       case 3:
         endpoint = '/db/lcom-src';
+        check = 'LCOM-SRC';
         break;
       case 4:
         endpoint = '/db/lcom-stlcomp';
+        check = 'LCOM-STLCOMP';
         break;
       default:
         console.error("Invalid selectedDropListValue:", selectedDropListValue);
@@ -2096,10 +2119,10 @@ const generateEnvelopeLoadCombination = async () => {
     }
 
     // Make the POST request to the determined endpoint
-    const response = await midasAPI("POST", endpoint, civilComJson);
+    const response = await midasAPI("PUT", endpoint, civilCom);
     console.log(response);
-
-    if (response && response[endpoint]) {
+     
+    if (response && response[check]) {
       enqueueSnackbar("Load-Combination Generated Successfully", {
         variant: "success",
         anchorOrigin: {
@@ -2108,13 +2131,13 @@ const generateEnvelopeLoadCombination = async () => {
         }
       });
     } else {
-      enqueueSnackbar("Failed to Generate Load-Combination", {
-        variant: "error",
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        }
-      });
+      // enqueueSnackbar("Failed to Generate Load-Combination", {
+      //   variant: "error",
+      //   anchorOrigin: {
+      //     vertical: "top",
+      //     horizontal: "center",
+      //   }
+      // });
     }
   } catch (error) {
     // console.error("Error generating load combination:", error);
@@ -2139,14 +2162,16 @@ const toggleExcelReader = () => {
 const [loadCombinations, setLoadCombinations] = useState(
   [
     { loadCombination: '', active: '', type: '', loadCases: [{
-              loadName: '',
+              loadCaseName: '',
               sign: '',
               factor1: '',
               factor2: '',
               factor3: '',
               factor4: '',
               factor5: ''
-}]}]);
+}]
+}
+]);
 useEffect(() => {
   // Ensure there is always an additional empty row at the end
   const lastCombination = loadCombinations[loadCombinations.length - 1];
