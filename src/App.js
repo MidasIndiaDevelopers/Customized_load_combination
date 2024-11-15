@@ -713,7 +713,7 @@ function combineAddEither(inputObj) {
       obj.forEach((value) => {
         if (typeof value === 'object' && value !== null) {
           processKeyValuePairs(value, parentKey);
-        }
+    }
       });}
     else {
       processKeyValuePairs(obj, parentKey);
@@ -926,7 +926,7 @@ async function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
   if (strengthCombinations.length === 0) {
     console.error("No combinations with active set to 'Strength' found.");
-    return [];
+    // return [];
   }
   let allFinalCombinations = [];
   let combinationCounter = 0; 
@@ -1117,8 +1117,95 @@ console.log(joinedCombinations);
     
       // console.log(`Created envelope combination: ${combinationName}`, civilCom);
     } 
+  
   }
- 
+  let inactiveCombinations = [];
+  if (values["Generate inactive load combinations in midas"]) {
+    // Filter out inactive combinations
+    inactiveCombinations = loadCombinations.filter(combination => combination.active === "Inactive");
+    console.log(inactiveCombinations);
+  
+    if (inactiveCombinations.length === 0) {
+      console.warn("No combinations with active set to 'Inactive' found.");
+    } else {
+      // Process each inactive combination
+      for (const inactiveCombination of inactiveCombinations) {
+        const comb_name = inactiveCombination.loadCombination;
+        const type = inactiveCombination.type;
+        console.log(inactiveCombination);
+  
+        // Initialize an object to store results for each combination
+        const result = {};
+        let factorCombination = [];
+        let new_combo = [];
+        // Iterate through each loadCase
+        for (const loadCase of inactiveCombination.loadCases) {
+          const loadCaseName = loadCase.loadCaseName; // Assuming loadCaseName is a property
+          if (loadNames.includes(loadCaseName)) {
+            // If loadCase is in loadNames, directly store it in the result
+            if (!result[comb_name]) {
+              result[comb_name] = []; // Initialize if not already present
+            }
+            result[comb_name].push(loadCase);
+          } else {
+            // Otherwise, process factors for this loadCase
+            const factors = [];
+            
+            for (let factorNum = 1; factorNum <= 5; factorNum++) {
+              const factorKey = `factor${factorNum}`;
+              const factorValue = loadCase[factorKey]; // Default to 1 if undefined
+              factors.push({ factor: factorNum, value: factorValue });
+            }
+  
+            // Loop through each factor (1 to 5)
+            for (let factor = 1; factor <= 5; factor++) {
+              const sign = loadCase.sign || '+';
+              const factorObject = factors.find(f => f.factor === factor);
+  
+              if (factorObject && factorObject.value !== undefined && factorObject.value !== ""  && factorObject.value !== null&& factorObject.value != 0)  {
+                // Call createCombinations for the current factor
+                const newCombination = createCombinations(
+                  loadCase,
+                  inactiveCombination,
+                  loadCombinations,
+                  loadNames,
+                  [], // Base cases or additional data
+                  factorObject.value,
+                  factor,
+                  sign
+                );
+                console.log("New Combination for Factor:", factor, newCombination); 
+                new_combo.push(newCombination);
+                console.log(new_combo);
+                // Store the result in the corresponding combination
+                if (!result[comb_name]) {
+                  result[comb_name] = [];
+                }
+              }
+            }
+           
+          }
+        }
+       
+          const flatCombo = new_combo.flat(); // Flatten once
+          const combine = combineAddEither(flatCombo);
+        const sign_combo = permutation_sign(combine);
+        const factor_combo = join_factor(sign_combo);
+        console.log(factor_combo);
+        const combo_join = join([factor_combo]);
+        console.log(combo_join);
+        factorCombination.push(combo_join);
+        
+        console.log(factorCombination);
+        if (factorCombination.length > 0){
+          result[comb_name].push(factorCombination);
+        }
+       
+        console.log("Final Result for Combination:", comb_name, result);
+      }
+    }
+  }
+  
   console.log(allFinalCombinations);
   return allFinalCombinations;
 }
