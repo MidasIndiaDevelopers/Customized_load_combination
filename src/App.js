@@ -1120,6 +1120,7 @@ console.log(joinedCombinations);
   
   }
   let inactiveCombinations = [];
+  let inactive_combo = [];
   if (values["Generate inactive load combinations in midas"]) {
     // Filter out inactive combinations
     inactiveCombinations = loadCombinations.filter(combination => combination.active === "Inactive");
@@ -1130,12 +1131,13 @@ console.log(joinedCombinations);
     } else {
       // Process each inactive combination
       for (const inactiveCombination of inactiveCombinations) {
+        const result = {};
         const comb_name = inactiveCombination.loadCombination;
         const type = inactiveCombination.type;
         console.log(inactiveCombination);
   
         // Initialize an object to store results for each combination
-        const result = {};
+        
         let factorCombination = [];
         let new_combo = [];
         // Iterate through each loadCase
@@ -1187,8 +1189,8 @@ console.log(joinedCombinations);
           }
         }
        
-          const flatCombo = new_combo.flat(); // Flatten once
-          const combine = combineAddEither(flatCombo);
+          // const flatCombo = new_combo.flat(); // Flatten once
+          const combine = combineAddEither(new_combo);
         const sign_combo = permutation_sign(combine);
         const factor_combo = join_factor(sign_combo);
         console.log(factor_combo);
@@ -1202,10 +1204,12 @@ console.log(joinedCombinations);
         }
        
         console.log("Final Result for Combination:", comb_name, result);
+        inactive_combo.push(result);
       }
+      
     }
   }
-  
+  console.log(inactive_combo);
   console.log(allFinalCombinations);
   return allFinalCombinations;
 }
@@ -2168,19 +2172,23 @@ async function Generate_Load_Combination() {
   const basicCombinations = generateBasicCombinations(loadCombinations);
   console.log(basicCombinations);
 }
-const generateEnvelopeLoadCombination = async () => {
-  // Check if civilCom.Assign has any entries
+const isGeneratingRef = useRef(false);
+async function generateEnvelopeLoadCombination() {
   if (Object.keys(civilCom.Assign).length === 0) {
     console.log("civilCom.Assign is empty, no combinations to process.");
-    return; // Exit the function if Assign is empty
+    return;
   }
 
-  // const node = 
-  const civilComJson = JSON.stringify(civilCom, null, 2);
-  console.log(civilComJson);
-  console.log(civilCom);
+  // Prevent duplicate calls
+  if (isGeneratingRef.current) return;
+
+  isGeneratingRef.current = true; // Set the flag
+
   try {
-    // Determine the endpoint based on the selectedDropListValue
+    const civilComJson = JSON.stringify(civilCom, null, 2);
+    console.log(civilComJson);
+    console.log(civilCom);
+
     let endpoint = '';
     let check = '';
     switch (selectedDropListValue) {
@@ -2202,46 +2210,40 @@ const generateEnvelopeLoadCombination = async () => {
         break;
       default:
         console.error("Invalid selectedDropListValue:", selectedDropListValue);
-        return; // Exit the function if the value is invalid
+        return;
     }
 
-    // Make the POST request to the determined endpoint
     const response = await midasAPI("PUT", endpoint, civilCom);
     console.log(response);
-     
+
     if (response && response[check]) {
       enqueueSnackbar("Load-Combination Generated Successfully", {
         variant: "success",
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        }
+        anchorOrigin: { vertical: "top", horizontal: "center" },
       });
     } else {
-      // enqueueSnackbar("Failed to Generate Load-Combination", {
-      //   variant: "error",
-      //   anchorOrigin: {
-      //     vertical: "top",
-      //     horizontal: "center",
-      //   }
-      // });
+      enqueueSnackbar("Failed to Generate Load-Combination", {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "center" },
+      });
     }
   } catch (error) {
-    // console.error("Error generating load combination:", error);
-    // enqueueSnackbar("An error occurred while generating Load-Combination", {
-    //   variant: "error",
-    //   anchorOrigin: {
-    //     vertical: "top",
-    //     horizontal: "center",
-    //   }
-    // });
+    console.error("Error generating load combination:", error);
+    enqueueSnackbar("An error occurred while generating Load-Combination", {
+      variant: "error",
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+  } finally {
+    isGeneratingRef.current = false; // Reset the flag
+    civilCom.Assign = {};
+    console.log("civilCom has been refreshed:", civilCom);
   }
-};
+}
 
-// Call the function when needed, for example:
-if (Object.keys(civilCom.Assign).length > 0) {
+if (Object.keys(civilCom.Assign).length > 0 && !isGeneratingRef.current) {
   generateEnvelopeLoadCombination();
 }
+
 
 const toggleExcelReader = () => {
   fileInputRef.current.click();
