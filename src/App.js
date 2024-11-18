@@ -743,18 +743,24 @@ function combineAddEither(inputObj) {
               }
             });
           } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
-            // If subArrayOrItem is a direct object (not an array)
-            const newObj = {};
-            // Loop through each property of the subArrayOrItem object
-            for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
-              newObj[itemKey] = itemValue; // Add each property to the new object
-              // If the object contains "Add" or "Either", process it again
-              if (itemKey === 'Add' || itemKey === 'Either' || itemKey === 'Envelope') {
-                processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
-              }
+             // If subArrayOrItem is a direct object (not an array)
+          const newObj = {};
+          // Loop through each property of the subArrayOrItem object
+          for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
+            // Check if the key is "Add" and the first key is "Either" or "Envelope"
+            let updatedKey = itemKey;
+            if (itemKey === 'Add' && (parentKey === 'Either' || parentKey === 'Envelope')) {
+              updatedKey = parentKey; // Change the key to match the parentKey
             }
-            // Push the new object into the temp array
-            temp.push(newObj);
+            newObj[updatedKey] = itemValue; // Add each property to the new object
+
+            // If the object contains "Add", "Either", or "Envelope", process it again
+            if (itemKey === 'Add' || itemKey === 'Either' || itemKey === 'Envelope') {
+              processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
+            }
+          }
+          // Push the new object into the temp array
+          temp.push(newObj);
            } 
           else {
             // If the value is not an object, call processObject recursively
@@ -1117,98 +1123,164 @@ console.log(joinedCombinations);
     
       // console.log(`Created envelope combination: ${combinationName}`, civilCom);
     } 
-  
   }
   let inactiveCombinations = [];
-  let inactive_combo = [];
-  if (values["Generate inactive load combinations in midas"]) {
-    // Filter out inactive combinations
-    inactiveCombinations = loadCombinations.filter(combination => combination.active === "Inactive");
-    console.log(inactiveCombinations);
+let inactive_combo = [];
+
+if (values["Generate inactive load combinations in midas"]) {
   
-    if (inactiveCombinations.length === 0) {
-      console.warn("No combinations with active set to 'Inactive' found.");
-    } else {
-      // Process each inactive combination
-      for (const inactiveCombination of inactiveCombinations) {
-        const result = {};
-        const comb_name = inactiveCombination.loadCombination;
-        const type = inactiveCombination.type;
-        console.log(inactiveCombination);
-  
-        // Initialize an object to store results for each combination
-        
-        let factorCombination = [];
-        let new_combo = [];
-        // Iterate through each loadCase
-        for (const loadCase of inactiveCombination.loadCases) {
-          const loadCaseName = loadCase.loadCaseName; // Assuming loadCaseName is a property
-          if (loadNames.includes(loadCaseName)) {
-            // If loadCase is in loadNames, directly store it in the result
-            if (!result[comb_name]) {
-              result[comb_name] = []; // Initialize if not already present
-            }
-            result[comb_name].push(loadCase);
-          } else {
-            // Otherwise, process factors for this loadCase
-            const factors = [];
-            
-            for (let factorNum = 1; factorNum <= 5; factorNum++) {
-              const factorKey = `factor${factorNum}`;
-              const factorValue = loadCase[factorKey]; // Default to 1 if undefined
-              factors.push({ factor: factorNum, value: factorValue });
-            }
-  
-            // Loop through each factor (1 to 5)
-            for (let factor = 1; factor <= 5; factor++) {
-              const sign = loadCase.sign || '+';
-              const factorObject = factors.find(f => f.factor === factor);
-  
-              if (factorObject && factorObject.value !== undefined && factorObject.value !== ""  && factorObject.value !== null&& factorObject.value != 0)  {
-                // Call createCombinations for the current factor
-                const newCombination = createCombinations(
-                  loadCase,
-                  inactiveCombination,
-                  loadCombinations,
-                  loadNames,
-                  [], // Base cases or additional data
-                  factorObject.value,
-                  factor,
-                  sign
-                );
-                console.log("New Combination for Factor:", factor, newCombination); 
-                new_combo.push(newCombination);
-                console.log(new_combo);
-                // Store the result in the corresponding combination
-                if (!result[comb_name]) {
-                  result[comb_name] = [];
-                }
+  // Filter out inactive combinations
+  inactiveCombinations = loadCombinations.filter(combination => combination.active === "Inactive");
+  console.log(inactiveCombinations);
+
+  if (inactiveCombinations.length === 0) {
+    console.warn("No combinations with active set to 'Inactive' found.");
+  } else {
+    // Process each inactive combination
+    for (const inactiveCombination of inactiveCombinations) {
+      let addObj = [];
+let eitherArray = [];
+let envelopeObj = [];
+      const comb_name = inactiveCombination.loadCombination;
+      const type = inactiveCombination.type;
+
+      console.log(inactiveCombination);
+
+      // Initialize an object to store results for each combination
+      const result = { comb_name, type, factors: [] };
+      let factorCombination = [];
+      let new_combo = [];
+
+      // Iterate through each loadCase
+      for (const loadCase of inactiveCombination.loadCases) {
+        const loadCaseName = loadCase.loadCaseName; // Assuming loadCaseName is a property
+        if (loadNames.includes(loadCaseName)) {
+          // If loadCase is in loadNames, directly store it in the result
+          if (!result.factors) {
+            result.factors = []; // Initialize if not already present
+          }
+          result.factors.push(loadCase);
+        } else {
+          // Otherwise, process factors for this loadCase
+          const factors = [];
+
+          for (let factorNum = 1; factorNum <= 5; factorNum++) {
+            const factorKey = `factor${factorNum}`;
+            const factorValue = loadCase[factorKey]; // Default to 1 if undefined
+            factors.push({ factor: factorNum, value: factorValue });
+          }
+
+          // Loop through each factor (1 to 5)
+          for (let factor = 1; factor <= 5; factor++) {
+            const sign = loadCase.sign || '+';
+            const factorObject = factors.find(f => f.factor === factor);
+
+            if (factorObject && factorObject.value !== undefined && factorObject.value !== "" && factorObject.value !== null && factorObject.value != 0) {
+              // Call createCombinations for the current factor
+              const newCombination = createCombinations(
+                loadCase,
+                inactiveCombination,
+                loadCombinations,
+                loadNames,
+                [], // Base cases or additional data
+                factorObject.value,
+                factor,
+                sign
+              );
+              console.log("New Combination for Factor:", factor, newCombination);
+              new_combo.push(newCombination);
+              console.log(new_combo);
+
+              // Store the result in the corresponding combination
+              if (!result.factors) {
+                result.factors = [];
               }
             }
-           
           }
         }
-       
-          // const flatCombo = new_combo.flat(); // Flatten once
-          const combine = combineAddEither(new_combo);
-        const sign_combo = permutation_sign(combine);
-        const factor_combo = join_factor(sign_combo);
-        console.log(factor_combo);
-        const combo_join = join([factor_combo]);
-        console.log(combo_join);
-        factorCombination.push(combo_join);
-        
-        console.log(factorCombination);
-        if (factorCombination.length > 0){
-          result[comb_name].push(factorCombination);
-        }
-       
-        console.log("Final Result for Combination:", comb_name, result);
-        inactive_combo.push(result);
       }
-      
+      const combine = combineAddEither(new_combo);
+      const sign_combo = permutation_sign(combine);
+      const factor_combo = join_factor(sign_combo);
+      console.log(factor_combo);
+      const combo_join = join([factor_combo]);
+      console.log(combo_join);
+      factorCombination.push(combo_join);
+      console.log(factorCombination);
+      if (factorCombination.length > 0) {
+        // Filter out null or undefined entries in factorCombination
+        const validCombinations = factorCombination.filter(subArray => subArray.length > 0);
+        // Check if validCombinations has entries before pushing
+        if (validCombinations.length > 0) {
+          result.factors.push(...validCombinations); // Add only valid combinations to factors
+        }
+        else {
+          // Push valid factors to respective arrays based on the result type
+          if (result.factors && result.factors.length > 0) {
+            if (result.type === "Add") {
+              addObj.push(...result.factors);
+            } else if (result.type === "Either") {
+              eitherArray.push(...result.factors);
+            } else if (result.type === "Envelope") {
+              envelopeObj.push(...result.factors);
+            }
+          }
+        
+          // Create combinedArray with nested arrays
+          const combinedArray = {
+            eitherArray: [[[[...eitherArray]]]], // Wrap in one more array
+            addObj: [[[[...addObj]]]],           // Wrap in one more array
+            envelopeObj: [[[[...envelopeObj]]]]    // Wrap in one more array
+          };
+        
+          // Pass combinedArray to permutation_sign
+          const processedResult = permutation_sign(combinedArray);
+        
+          // Log the processed result
+          console.log("Processed Result:", processedResult);
+        
+          // Flatten the arrays for each object in processedResult using flat(4)
+          const flattenedAddObj = processedResult.addObj.flat(3);
+          const flattenedEitherArray = processedResult.eitherArray.flat(3);
+          const flattenedEnvelopeObj = processedResult.envelopeObj.flat(3);
+        
+          // Initialize an array to hold valid factors
+          const validFactors = [];
+        
+          validFactors.push(...flattenedAddObj, ...flattenedEitherArray, ...flattenedEnvelopeObj);
+          result.factors = validFactors;
+          // Log the result.factors after processing
+          console.log("Result Factors:", result.factors);
+        }
+      }
+      console.log("Final Result for Combination:", comb_name, result);
+      const transformedFactors = [];
+
+// Process each subarray in `result.factors`
+result.factors.forEach(subArray => {
+    // Extract all factor keys dynamically
+    const factorKeys = Object.keys(subArray).filter(key => key.startsWith('factor'));
+
+    // For each factor key, create a subarray
+    factorKeys.forEach(factorKey => {
+        const newSubArray = subArray.map(item => ({
+            loadCaseName: item.loadCaseName,
+            sign: item.sign,
+            factor: item[factorKey] // Assign the specific factor value
+        }));
+
+        // Add the generated subarray to the transformed factors
+        transformedFactors.push(newSubArray);
+    });
+});
+
+// Replace the original `factors` with the transformed one
+result.factors = transformedFactors;
+      inactive_combo.push(result);
     }
   }
+}
+
   console.log(inactive_combo);
   console.log(allFinalCombinations);
   return allFinalCombinations;
