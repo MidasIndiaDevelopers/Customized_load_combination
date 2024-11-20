@@ -32,7 +32,7 @@ const [selectedDropListValue, setSelectedDropListValue] = useState(1);
 const [isAddingLoadCase, setIsAddingLoadCase] = useState(false);
 const [isDeletingRow, setIsDeletingRow] = useState(false);
 const addLoadCaseTimeout = useRef(null);
-const [civilComState, setCivilComState] = useState({ "Assign": {} });
+const [civilComEnv, setCivilComeEnv] = useState({ "Assign": {} });
 // let [loadNames, setLoadNames] = useState(null);
 const [civilCom, setCivilCom] = useState({ "Assign": {} });
 const [checkedOptions, setCheckedOptions] = useState({
@@ -489,7 +489,7 @@ else if (dimension > 2) {
                 for (let i = 1; i <= 5; i++) {
                   const factorKey = `factor${i}`;
                   let multipliedFactor = eitherLoadCase[factorKey] * value;
-                  multipliedFactor = eitherLoadCase[factorKey] !== undefined ? eitherLoadCase[factorKey] * value : undefined;
+                  multipliedFactor = eitherLoadCase[factorKey] !== undefined && eitherLoadCase[factorKey] !== "" ? eitherLoadCase[factorKey] * value : undefined;
                   // const previousFactor = factorIndexArray.length > 0 ? factorIndexArray[factorIndexArray.length - 1 -1] - 1: i - 1;
                   // const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(previousFactor)); // Adjust for `n` dimensions
                   // Remove the last value from factorIndexArray
@@ -561,7 +561,7 @@ else if (dimension > 2) {
                 for (let i = 1; i <= 5; i++) {
                   const factorKey = `factor${i}`;
                   let multipliedFactor = addLoadCase[factorKey] * value;
-                  multipliedFactor = addLoadCase[factorKey] !== undefined ? addLoadCase[factorKey] * value : undefined;
+                  multipliedFactor = addLoadCase[factorKey] !== undefined && addLoadCase[factorKey] !== "" ? addLoadCase[factorKey] * value : undefined;
                    // Handling dimension 1
       if (dimension === 1) {
         // In 1D array, we simply set the value at the first index
@@ -630,7 +630,7 @@ else if (dimension > 2) {
                 for (let i = 1; i <= 5; i++) {
                   const factorKey = `factor${i}`;
                   let multipliedFactor = envelopeLoadCase[factorKey] * value;
-                  multipliedFactor = envelopeLoadCase[factorKey] !== undefined ? envelopeLoadCase[factorKey] * value : undefined;
+                  multipliedFactor = envelopeLoadCase[factorKey] !== undefined && envelopeLoadCase[factorKey] !== "" ? envelopeLoadCase[factorKey] * value : undefined;
 
                   if (dimension === 1) {
                     setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, [i - 1]);
@@ -950,15 +950,41 @@ function findStrengthCombinations(combinations) {
     combo.active === "Strength" || combo.active === "Service"
   );
 }
-// const civil_com = { "Assign": {} };
 async function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
   if (strengthCombinations.length === 0) {
     console.error("No combinations with active set to 'Strength' found.");
-    // return [];
   }
+  let endpoint = '';
+    let check = '';
+    switch (selectedDropListValue) {
+      case 1:
+        endpoint = '/db/lcom-steel';
+        check = 'LCOM-STEEL';
+        break;
+      case 2:
+        endpoint = '/db/lcom-conc';
+        check = 'LCOM-CONC';
+        break;
+      case 3:
+        endpoint = '/db/lcom-src';
+        check = 'LCOM-SRC';
+        break;
+      case 4:
+        endpoint = '/db/lcom-stlcomp';
+        check = 'LCOM-STLCOMP';
+        break;
+      default:
+        console.error("Invalid selectedDropListValue:", selectedDropListValue);
+        return;
+    }
+
+  const load_combo = await midasAPI("GET", endpoint,{});
+  console.log(load_combo);
+  const initial_lc = Object.keys(load_combo[check]).length;
   let allFinalCombinations = [];
   let combinationCounter = 0; 
+  let last_value;
   let backupCivilCom = { Assign: {} };
   // Iterate over each strengthCombination
   for (const strengthCombination of strengthCombinations) {
@@ -1061,18 +1087,15 @@ console.log(joinedCombinations);
           };
         });
         // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
-        backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
+        backupCivilCom.Assign[`${idx + 1 + combinationCounter + initial_lc}`] = {
           "NAME": combinationName,
           "ACTIVE": "ACTIVE",
           "bCB": false,
           "iTYPE": 0,
           "vCOMB": vCOMB
       };
-      
-      // Then, update the state with setCivilCom
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
-        // console.log(`Created envelope combination: ${combinationName}`, civilCom);  
-        // console.log("Backup CivilCom:", backupCivilCom);
+      last_value = idx + 1 + combinationCounter;
       });
   }
     if (type === "Either") {
@@ -1098,7 +1121,7 @@ console.log(joinedCombinations);
           };
         });
         // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
-        backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
+        backupCivilCom.Assign[`${idx + 1 + combinationCounter + initial_lc}`] = {
           "NAME": combinationName,
           "ACTIVE": "ACTIVE",
           "bCB": false,
@@ -1108,8 +1131,7 @@ console.log(joinedCombinations);
       
       // Then, update the state with setCivilCom
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
-        // console.log(`Created envelope combination: ${combinationName}`, civilCom);
-        // console.log("Backup CivilCom:", backupCivilCom);
+      last_value = idx + 1 + combinationCounter + initial_lc;
       });
     }
     if (values["Generate envelop load combinations in midas"]) {
@@ -1123,35 +1145,49 @@ console.log(joinedCombinations);
         const assignEntry = backupCivilCom.Assign[key];
         if (assignEntry) {
           // Extract the name part before the underscore
+          let endpoint = '';
+          let check = '';
+          switch (selectedDropListValue) {
+            case 1:
+              endpoint = 'CBS';
+              break;
+            case 2:
+              endpoint = 'CBC';
+              break;
+            case 3:
+              endpoint = 'CBR';
+              break;
+            case 4:
+              endpoint = 'CBSC';
+              break;
+          }
           
           const vCombObject = {
-            "ANAL": assignEntry.vCOMB[0]?.ANAL || "ST",  // Using ANAL from the first entry in vCOMB if available, else default to "ST"
+            "ANAL": endpoint,  // Using ANAL from the first entry in vCOMB if available, else default to "ST"
             "LCNAME": assignEntry.NAME,  // Storing just the base name (before the underscore)
             "FACTOR": 1
           };
           allVCombEntries.push(vCombObject);
         }
       }
-      setCivilCom(prevState => {
+      setCivilComeEnv(prevState => {
         const newAssign = { ...prevState.Assign };
-        newAssign[combinationName] = {
+        newAssign[`${last_value + 1}`] = {
           "NAME": combinationName,
-          "KIND": "GEN",
-          "ACTIVE": "INACTIVE",
-          "iTYPE": 0,
+          "ACTIVE": "STRENGTH",
+          "bCB": true,
+          "iTYPE": 1,
           "vCOMB": allVCombEntries
         };
         return { ...prevState, Assign: newAssign };
       });
-    
-      // console.log(`Created envelope combination: ${combinationName}`, civilCom);
     } 
   }
   let inactiveCombinations = [];
 let inactive_combo = [];
 
 if (values["Generate inactive load combinations in midas"]) {
-  
+  let all_inactive = [];
   // Filter out inactive combinations
   inactiveCombinations = loadCombinations.filter(combination => combination.active === "Inactive");
   console.log(inactiveCombinations);
@@ -1162,20 +1198,19 @@ if (values["Generate inactive load combinations in midas"]) {
     // Process each inactive combination
     for (const inactiveCombination of inactiveCombinations) {
       let addObj = [];
-let eitherArray = [];
-let envelopeObj = [];
+      let eitherArray = [];
+      let envelopeObj = [];
       const comb_name = inactiveCombination.loadCombination;
       const type = inactiveCombination.type;
 
       console.log(inactiveCombination);
-
-      // Initialize an object to store results for each combination
       const result = { comb_name, type, factors: [] };
       let factorCombination = [];
-      let new_combo = [];
-
+      
+      let factor_combos = [];
       // Iterate through each loadCase
       for (const loadCase of inactiveCombination.loadCases) {
+        let new_combo = [];
         const loadCaseName = loadCase.loadCaseName; // Assuming loadCaseName is a property
         if (loadNames.includes(loadCaseName)) {
           // If loadCase is in loadNames, directly store it in the result
@@ -1221,16 +1256,108 @@ let envelopeObj = [];
             }
           }
         }
-      }
-      const combine = combineAddEither(new_combo);
+        const combine = combineAddEither(new_combo);
       const sign_combo = permutation_sign(combine);
-      const factor_combo = join_factor(sign_combo);
+      let factor_combo = join_factor(sign_combo);
       console.log(factor_combo);
-      const combo_join = join([factor_combo]);
-      console.log(combo_join);
-      factorCombination.push(combo_join);
+      factor_combos.push(factor_combo);
+      console.log(factor_combos);
+      }
+      
+      for (const subArray of factor_combos) {
+        const combo_join = join(factor_combos);
+        factorCombination.push(combo_join); // Push the result
+      }
       console.log(factorCombination);
-      if (factorCombination.length > 0) {
+      if (type === 'Add') {
+        let joinedComb = [];
+        // Recursive helper function to generate combinations from joinArray
+        function combineArrays(arrays, index = 0, currentCombination = []) {
+          if (index === arrays.length) {
+            // If we've combined arrays from all groups, push the result
+            joinedComb.push([...currentCombination]);
+            return;
+          }
+          for (const subArray of arrays[index]) {
+            // Combine the current subArray with the ongoing combination
+            currentCombination.push(...subArray);
+            combineArrays(arrays, index + 1, currentCombination);
+            // Backtrack to explore other combinations
+            currentCombination.length -= subArray.length;
+          }
+        }
+        for (const subArray of factorCombination) {
+       
+  if (subArray.length > 0) {
+    // Pass the flattened subArray to combineArrays
+    combineArrays(subArray);
+    
+    // Push the joined combinations to the all_inactive array
+    all_inactive.push(...joinedComb);
+    
+    // Reset joinedComb for the next iteration
+    joinedComb = [];
+  }
+      }
+     
+        all_inactive.forEach((combArray, idx) => {
+          const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
+          // Prepare the vCOMB structure for this combination
+          let vCOMB = combArray.map((comb) => {
+            // Search for the matching key in loadNames_key
+            const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
+            const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+            return {
+              "ANAL": analysisType,
+              "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
+              "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
+            };
+          });
+          // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
+          backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
+            "NAME": combinationName,
+            "ACTIVE": "ACTIVE",
+            "bCB": false,
+            "iTYPE": 0,
+            "vCOMB": vCOMB
+        };
+        setCivilCom({ Assign: { ...backupCivilCom.Assign } });
+        });
+    }
+      if (type === "Either") {
+        const concatenatedArray = factorCombination.flat();
+        console.log(concatenatedArray);
+        concatenatedArray.forEach((combArray) => {
+          combArray.forEach(subArray => allFinalCombinations.push(subArray));
+        });
+      
+        // Now, iterate over allFinalCombinations to create and set vCOMB for each combination
+        all_inactive.forEach((combArray, idx) => {
+          combinationCounter++;
+          const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
+          // Prepare the vCOMB structure for this combination
+          let vCOMB = combArray.map((comb) => {
+            // Search for the matching key in loadNames_key
+            const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
+            const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+            return {
+              "ANAL": analysisType,
+              "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
+              "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
+            };
+          });
+          // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
+          backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
+            "NAME": combinationName,
+            "ACTIVE": "ACTIVE",
+            "bCB": false,
+            "iTYPE": 0,
+            "vCOMB": vCOMB
+        };
+        setCivilCom({ Assign: { ...backupCivilCom.Assign } });
+        });
+      }
+      if (all_inactive.length > 0) {
         // Filter out null or undefined entries in factorCombination
         const validCombinations = factorCombination.filter(subArray => subArray.length > 0);
         // Check if validCombinations has entries before pushing
@@ -1248,8 +1375,6 @@ let envelopeObj = [];
               envelopeObj.push(...result.factors);
             }
           }
-        
-          // Create combinedArray with nested arrays
           const combinedArray = {
             eitherArray: [[[[...eitherArray]]]], // Wrap in one more array
             addObj: [[[[...addObj]]]],           // Wrap in one more array
@@ -1291,31 +1416,33 @@ let envelopeObj = [];
             .filter(key => key.startsWith('factor'))             // Keep only keys starting with 'factor'
     )];
     
-    allFactorKeys.forEach((factorKey) => {
-      const subArrayForKey = []; // Group subarrays for the current factor key
+    if (allFactorKeys.length > 0) {
+      allFactorKeys.forEach((factorKey) => {
+          const subArrayForKey = []; // Group subarrays for the current factor key
   
-      // Process each subArray for the current factor key
-      result.factors.forEach((subArray) => {
-          const processedSubArray = {
-              loadCaseName: subArray.loadCaseName,
-              sign: subArray.sign,
-              factor: subArray[factorKey], // Handle undefined factor values
-          };
+          // Process each subArray for the current factor key
+          result.factors.forEach((subArray) => {
+              const processedSubArray = {
+                  loadCaseName: subArray.loadCaseName,
+                  sign: subArray.sign,
+                  factor: subArray[factorKey], // Handle undefined factor values
+              };
   
-          // Add the processed object to the current factor key group
-          if(processedSubArray.factor !== undefined && processedSubArray.factor !== "")  {
-          subArrayForKey.push(processedSubArray);
+              // Add the processed object to the current factor key group if valid
+              if (processedSubArray.factor !== undefined && processedSubArray.factor !== "") {
+                  subArrayForKey.push(processedSubArray);
+              }
+          });
+  
+          // Add the group to transformedFactors if it contains valid data
+          if (subArrayForKey.length > 0) {
+              transformedFactors.push(subArrayForKey);
           }
       });
   
-      if (subArrayForKey.length > 0) {
-        transformedFactors.push(subArrayForKey);
-    }
-  });
-  
-  console.log("Transformed Factors:", transformedFactors);
-  
-result.factors = transformedFactors;
+      // Update result.factors with transformed factors
+      result.factors = transformedFactors;
+  } 
       inactive_combo.push(result);
     }
   }
@@ -1326,7 +1453,7 @@ result.factors = transformedFactors;
 }
 
 console.log("Civil",civilCom);
-
+console.log("Civil_env",civilComEnv);
 function join_factor(finalCombinations_sign) {
   // Helper function to recursively flatten nested arrays
   const deepFlatten = (arr) => {
@@ -1461,8 +1588,6 @@ function join_factor(finalCombinations_sign) {
         }
       });
     }
-
-    // Combine factors from eitherArray, addObj, and envelopeObj into single object
     const combinedResults = {};
     const combineFactors = (items) => {
       let combinedResult = {};
@@ -1598,14 +1723,11 @@ function join(factorCombinations) {
       const extractedFactors = either.map(arr => {
         // Flatten the array if it contains nested arrays
         const flattenedArr = Array.isArray(arr) ? arr.flat() : [arr];
-        
-        // Process each object in the flattened array
         return flattenedArr.flatMap(factorObj => {
           if (Array.isArray(factorObj)) {
             // If factorObj itself is an array, process its items individually
             return factorObj.flatMap(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
           } else {
-            // Otherwise, process the object directly
             return extractFactorsFromObject(factorObj, factorIndex, i);
           }
         });
@@ -1706,7 +1828,7 @@ function join(factorCombinations) {
                     const factor = value.factor;
                     const factorValue = getSingleFactor(factor, factorIndex, i);
                     
-                    if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
+                    if (factorValue !== undefined && factorValue !== null) {
                       combinedResult.push({ loadCaseName, sign, factor: factorValue });
                     }
                   });
@@ -1726,10 +1848,7 @@ function join(factorCombinations) {
       }
       console.log('Extracted Factors:', extractedFactorsStore);
       console.log('All Combinations:', allCombinations);
-      // let mergearray = [];
-      // Convert object to an array of values for easier indexing
       const extractedValues = Object.values(extractedFactorsStore);
-// console.log(mergeArray);
 const mergeArray = [];
 // Helper function to generate permutations
 function getCustomCombinations(arrays,arrays_1) {
@@ -1751,13 +1870,10 @@ function getCustomCombinations(arrays,arrays_1) {
       return;
     }
     if (currentIndex === 0) {
-      // currentCombination.push(filteredArrays[currentIndex]);
-      // Iterate over the first array
       filteredArrays[currentIndex].forEach((subArray, index) => {
         if (filteredArrays[currentIndex + 1] !==  undefined) {
           // Pair the subArray from the current index with the opposite element in the next array
           const nextSubArray = filteredArrays[currentIndex + 1][filteredArrays[currentIndex + 1].length - 1 - index];
-          
           currentCombination.push(subArray, nextSubArray); // Add both subarrays to the combination
           buildCombination(currentCombination, currentIndex + 2); // Skip to the next index
           currentCombination.pop(); // Backtrack to try the next combination
@@ -1800,12 +1916,6 @@ for (let j = 0; j < 5; j++) {
     // Generate permutations for elementsToPermute and merge with fixedElement
     console.log(elementsToPermute);
     const permutations = getCustomCombinations(elementsToPermute,elementsToPermute_first);
-    // const cleanedPermutations = permutations.map(combination => {
-    //   // Filter out baseInnerArray.slice(1) from each combination
-    //   return combination.filter(subArray => JSON.stringify(subArray) !== JSON.stringify(baseInnerArray.slice(1)));
-    // });
-    
-    // console.log(cleanedPermutations);
     permutations.forEach(perm => {
       const mergedInnerArray = [fixedElement, ...perm];
       if (mergedInnerArray.every(el => el && el.length > 0)) {
@@ -1825,11 +1935,7 @@ console.log(mergeArray);
           finalCombinations.push([...tempResult]);
           return;
         }
-        // Debugging statement to check what arrays[index] contains
-        // console.log("Current index:", index, "arrays[index]:", arrays[index]);
-        // Check if arrays[index] is an array and is iterable
         if (Array.isArray(arrays[index])) {
-          // Loop through each item in the current array at 'index'
           for (const item of arrays[index]) {
             tempResult.push(item);  // Add the item to the current combination
             generateCombinations(arrays, tempResult, index + 1, finalCombinations);  // Recursively process the next array
@@ -1880,7 +1986,7 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
             const factorValue = getSingleFactor(factor, factorIndex, i);
             
             // Check if the factorValue is valid
-            if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
+            if (factorValue !== undefined && factorValue !== null) {
               addmultiResult.push({ loadCaseName, sign, factor: factorValue });
             }
           });
@@ -1900,13 +2006,9 @@ let allCombinations_multi = []; // To store the final results
 combinedResult.forEach((mainArray) => {
   // Loop through each inner array in mainArray
   mainArray.forEach((innerArray) => {
-    let combinedSet = []; // Array to store all combined arrays for this innerArray
-
-    // Loop through each key in the addResult object
+    let combinedSet = [];
     Object.keys(addresult).forEach((key) => {
-      const addArray = addresult[key]; // Access the array or subarray using the key
-      // if (innerArray && Array.isArray(innerArray) && addArray && Array.isArray(addArray)) {
-        // Iterate through the subarrays at the same index
+      const addArray = addresult[key];
         innerArray.forEach((subArray, index) => {
           const correspondingAddSubArray = addArray[key]; // Get the matching subarray from addArray
           // Only combine if both subarrays exist
@@ -1978,7 +2080,7 @@ console.log(joinedCombinations);
                   }
     
                   // Check if factorValue is valid and non-zero, then push it into subArrayCombination
-                  if (factorValue !== undefined && factorValue !== 0) {
+                  if (factorValue !== undefined) {
                     const combinedResult = { loadCaseName, sign, factor: factorValue };
                     subArrayCombination.push(combinedResult);
     
@@ -2328,6 +2430,7 @@ async function Generate_Load_Combination() {
   console.log(loadCombinations);
   const basicCombinations = generateBasicCombinations(loadCombinations);
   console.log(basicCombinations);
+  setGenerateLoading(false);
 }
 const isGeneratingRef = useRef(false);
 async function generateEnvelopeLoadCombination() {
@@ -2372,7 +2475,10 @@ async function generateEnvelopeLoadCombination() {
 
     const response = await midasAPI("PUT", endpoint, civilCom);
     console.log(response);
-
+    if(values['Generate envelop load combinations in midas']) {
+      const response_env = await midasAPI("PUT", endpoint, civilComEnv);
+      console.log(response_env);
+    }
     if (response && response[check]) {
       enqueueSnackbar("Load-Combination Generated Successfully", {
         variant: "success",
@@ -2393,7 +2499,9 @@ async function generateEnvelopeLoadCombination() {
   } finally {
     isGeneratingRef.current = false; // Reset the flag
     civilCom.Assign = {};
+    civilComEnv.Assign = {};
     console.log("civilCom has been refreshed:", civilCom);
+    console.log("civilComEnv has been refreshed:", civilComEnv);
   }
 }
 
@@ -2404,6 +2512,17 @@ if (Object.keys(civilCom.Assign).length > 0 && !isGeneratingRef.current) {
 
 const toggleExcelReader = () => {
   fileInputRef.current.click();
+};
+const handleImportClick = () => {
+  setImportLoading(true);
+
+  // Simulate file selection process
+  toggleExcelReader();
+
+  // Simulate a delay to represent the file handling process
+  setTimeout(() => {
+    setImportLoading(false); // Reset loading state
+  }, 5000); // Replace this with your actual import logic
 };
 const [loadCombinations, setLoadCombinations] = useState(
   [
@@ -2481,7 +2600,6 @@ const removeDuplicateFactors = (data) => {
           factor5: uniqueFactors[4] || undefined,
         };
       });
-
       return {
         ...combination,
         loadCases: updatedLoadCases,
@@ -2593,7 +2711,6 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   const handleInputChange = (index, field, value) => {
     setInputValue(value);
     debouncedHandleLoadCombinationChange(index, field, value);
-    
   };
   React.useEffect(() => {
     if (
@@ -2892,8 +3009,6 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
 )}
 
         </div>
-
-        {/* Dynamic Sign Dropdown */}
         <div
           style={{ flex: '1 1 25px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', position: 'relative' }}
           onClick={(e) => {
@@ -2930,8 +3045,8 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
       </div>
     ))}
     {/* {selectedLoadCombinationIndex >= 0 && ( */}
-    <div style={{ display: "flex", alignItems: "center" , width: "60%"}}>
-    {Buttons.NodeButton("contained", "Add Load Case", handleAddLoadCase)}
+    <div style={{ display: "flex", alignItems: "center" , width: "40%", marginLeft: "110px" }}>
+    {Buttons.NodeButton("contained", "Add Row", handleAddLoadCase)}
     {Buttons.NodeButton("contained", "Delete Row", handleDeleteRow)}
     </div>
   {/* )} */}
@@ -2940,37 +3055,18 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   </Panel>
   </Panel>
       <div style={{  width: '780px', height: '25px', display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly', backgroundColor: 'white', padding: '10px'}}>
-       {!exportLoading ? (
-  Buttons.SubButton("contained", "Export Load Combination", exportToExcel, exportLoading)
+      {Buttons.SubButton("contained", "Export Load Combination", exportToExcel, exportLoading)}
+
+{importLoading ? (
+     Buttons.SubButton("contained", "Importing")
 ) : (
-  <ComponentsButtonLoading
-    types="contained"
-    texts="Export Load Combination"
-    clickevent={exportToExcel}
-    loading={exportLoading}
-  />
+  Buttons.SubButton("contained", "Import Load Combination", handleImportClick)
 )}
 
-{!importLoading ? (
-  Buttons.SubButton("contained", "Import Load Combination", toggleExcelReader, importLoading)
+{generateLoading ? (
+     Buttons.SubButton("contained", "Generating")
 ) : (
-  <ComponentsButtonLoading
-    types="contained"
-    texts="Import Load Combination"
-    clickevent={toggleExcelReader}
-    loading={importLoading}
-  />
-)}
-
-{!generateLoading ? (
-  Buttons.SubButton("contained", "Generate Load Combination", Generate_Load_Combination, generateLoading)
-) : (
-  <ComponentsButtonLoading
-    types="contained"
-    texts="Generate Load Combination"
-    clickevent={Generate_Load_Combination}
-    loading={generateLoading}
-  />
+  Buttons.SubButton("contained", "Generate Load Combination", Generate_Load_Combination)
 )}
 
       </div>
