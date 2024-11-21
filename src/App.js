@@ -981,7 +981,10 @@ async function generateBasicCombinations(loadCombinations) {
 
   const load_combo = await midasAPI("GET", endpoint,{});
   console.log(load_combo);
-  const initial_lc = Object.keys(load_combo[check]).length;
+  let initial_lc = 0;
+  if(load_combo && load_combo[check] && !load_combo[check].hasOwnProperty('message')){
+    initial_lc = Object.keys(load_combo[check]).length;
+  } 
   let allFinalCombinations = [];
   let combinationCounter = 0; 
   let last_value;
