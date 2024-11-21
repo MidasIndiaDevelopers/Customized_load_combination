@@ -35,10 +35,6 @@ const addLoadCaseTimeout = useRef(null);
 const [civilComEnv, setCivilComeEnv] = useState({ "Assign": {} });
 // let [loadNames, setLoadNames] = useState(null);
 const [civilCom, setCivilCom] = useState({ "Assign": {} });
-const [checkedOptions, setCheckedOptions] = useState({
-  generateEnvelop: false,
-  generateInactive: false,
-});
 const [values, setValues] = useState({
   "Generate envelop load combinations in midas": false,
   "Generate inactive load combinations in midas": false,
@@ -1577,17 +1573,25 @@ function join_factor(finalCombinations_sign) {
 
     // Flatten envelopeObj
     if (Array.isArray(envelopeObj)) {
-      envelopeObj.forEach(envelopeArray => {
-        if (Array.isArray(envelopeArray)) {
-          envelopeArray.forEach(subArr => {
+      envelopeObj.forEach(arr => {
+        if (Array.isArray(arr)) {
+          const groupedArray = []; // To group subarrays together
+          arr.forEach((subArr) => {
             if (Array.isArray(subArr)) {
-              flattenedEnvelopeObj.push(deepFlatten(subArr));
+              // Flatten each subarray and push it into the grouped array
+              groupedArray.push(deepFlatten(subArr));
             } else {
-              flattenedEnvelopeObj.push(subArr);
+              // If it's not a subarray, directly push it
+              groupedArray.push(subArr);
             }
           });
+          // Push the grouped array as a single entry into the final output
+          if (groupedArray.length > 0) {
+            flattenedEnvelopeObj.push(groupedArray);
+          }
         } else {
-          flattenedEnvelopeObj.push(envelopeArray);
+          // If the current element is not an array, directly push it
+          flattenedEnvelopeObj.push(arr);
         }
       });
     }
@@ -1639,7 +1643,13 @@ function join_factor(finalCombinations_sign) {
         return [combineFactors([item])];
       }
     });
-    const commonArray_Envelope = flattenedEnvelopeObj.map(item => [combineFactors(Array.isArray(item) ? item : [item])]);
+    const commonArray_Envelope = flattenedEnvelopeObj.map(item => {
+      if (Array.isArray(item)) {
+        return item.map(subArray => combineFactors(Array.isArray(subArray) ? subArray : [subArray]));
+      } else {
+        return [combineFactors([item])];
+      }
+    });
 
     const normalizeFactors = (factorArray) => {
       if (!Array.isArray(factorArray)) return factorArray;
@@ -1723,22 +1733,42 @@ function join(factorCombinations) {
     }
     function combineMatchingFactors(either, factorIndex, i) {
       const combinedResult = [];
-      const extractedFactors = either.map(arr => {
-        // Flatten the array if it contains nested arrays
-        const flattenedArr = Array.isArray(arr) ? arr.flat() : [arr];
-        return flattenedArr.flatMap(factorObj => {
-          if (Array.isArray(factorObj)) {
-            // If factorObj itself is an array, process its items individually
-            return factorObj.flatMap(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
-          } else {
-            return extractFactorsFromObject(factorObj, factorIndex, i);
-          }
-        });
+      const extractedFactors = either.flatMap(arr => {
+        if (Array.isArray(arr) && arr.length > 1) {
+          // Split each subarray into separate arrays
+          return arr.flatMap(subArray => {
+            const flattenedArr = Array.isArray(subArray) ? subArray.flat() : [subArray];
+            return flattenedArr.flatMap(factorObj => {
+              if (Array.isArray(factorObj)) {
+                return factorObj.map(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
+              } else {
+                return [extractFactorsFromObject(factorObj, factorIndex, i)];
+              }
+            });
+          });
+        } else {
+          // Handle arrays with a single element or non-array elements
+          const flattenedArr = Array.isArray(arr) ? arr.flat() : [arr];
+          return flattenedArr.flatMap(factorObj => {
+            if (Array.isArray(factorObj)) {
+              return factorObj.flatMap(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
+            } else {
+              return [extractFactorsFromObject(factorObj, factorIndex, i)];
+            }
+          });
+        }
       });
+    
+      // Restructure to split subarrays into individual arrays
+      const correctedOutput = extractedFactors.flatMap(subArray =>
+        Array.isArray(subArray) ? subArray.map(item => [item]) : [[subArray]]
+      );
+    
       if (!extractedFactorsStore[factorIndex]) {
         extractedFactorsStore[factorIndex] = [];
       }
-      extractedFactorsStore[factorIndex][i] = extractedFactors;
+      extractedFactorsStore[factorIndex][i] = correctedOutput;
+    
       function generateCombinations(arrays, temp = [], index = 0) {
         // const filteredArrays = arrays.filter(array => Array.isArray(array) && array.length > 0);
         if (index === arrays.length) {
@@ -1799,7 +1829,7 @@ function join(factorCombinations) {
         console.log(factorIndex);
         for (let i = 0; i < maxI; i++) {
           let factorCombinations = [];
-          if (firstKey === "Either") {
+          if (firstKey === "Either" || firstKey === "Envelope") {
             
             either.forEach(eitherArray => {
               if (Array.isArray(eitherArray)) {
@@ -2055,7 +2085,7 @@ console.log(joinedCombinations);
     }
 
     const addJoin = [];
-    if (either.length === 0 && add.length > 0) {
+    if (either.length === 0 && envelope.length === 0 && add.length > 0) {
       const combined = [];
       
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
