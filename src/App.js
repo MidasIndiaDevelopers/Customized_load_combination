@@ -726,79 +726,89 @@ function multiplySigns(sign1, sign2) {
   // Default to '+' if no match found
   return '+';
 }
-function combineAddEither(inputObj) {
-  let eitherArray = []; 
-  let addObj = []; 
-  let envelopeObj = [];
-  let firstKey = null; // To store the first key
-  function processObject(obj, parentKey = null) {
-    if (Array.isArray(obj)) {
-      obj.forEach((value) => {
-        if (typeof value === 'object' && value !== null) {
-          processKeyValuePairs(value, parentKey);
-    }
-      });}
-    else {
-      processKeyValuePairs(obj, parentKey);
-    }
-  }
-  function processKeyValuePairs(obj, parentKey) {
-    // Loop through each key-value pair in the object
-    for (const [key, value] of Object.entries(obj)) {
-      // Only store the key if it's "Add" or "Either"
-      if (!firstKey) {
-        firstKey = key;
+// To store the first key
+  function combineAddEither(inputObj) {
+    let eitherArray = []; 
+    let addObj = []; 
+    let envelopeObj = [];
+    let firstKey = null; // To store the first key
+    let secondLastKey = null;
+    let lastvalue = [];
+    function processObject(obj, parentKey = null) {
+      if (Array.isArray(obj)) {
+        obj.forEach((value) => {
+          if (typeof value === 'object' && value !== null) {
+            processKeyValuePairs(value, parentKey);
       }
-      if (key === 'Add' || key === 'Either' || key === 'Envelope') {
-        parentKey = key;
+        });}
+      else {
+        processKeyValuePairs(obj, parentKey);
       }
-      if (Array.isArray(value)) {
-        let temp = [];
-        value.forEach((subArrayOrItem) => {
-          if (Array.isArray(subArrayOrItem)) {
-            // If the current value is a nested array, loop through the inner array
-            subArrayOrItem.forEach((item) => {
-              if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
-                // Check if the item has 'Add' or 'Either' and make the recursive call if needed
-                if (item.Add || item.Either || item.Envelope) {
-                  processKeyValuePairs(item, parentKey); // Recursive call for nested 'Add' or 'Either'
-                } else {
-                  // Directly push the item if it doesn't have 'Add' or 'Either'
-                  temp.push(item);
+    }
+    function processKeyValuePairs(obj, parentKey) {
+      
+      // Loop through each key-value pair in the object
+      for (const [key, value] of Object.entries(obj)) {
+        if (!firstKey) {
+          firstKey = key;
+        }
+        if (key === 'Add' || key === 'Either' || key === 'Envelope') {
+          parentKey = key;
+        }
+        // Push the current parentKey into the lastvalue array
+    if (parentKey) {
+      lastvalue.push(parentKey);
+    }
+        if (Array.isArray(value)) {
+          let temp = [];
+          value.forEach((subArrayOrItem) => {
+            if (Array.isArray(subArrayOrItem)) {
+              // If the current value is a nested array, loop through the inner array
+              subArrayOrItem.forEach((item) => {
+                if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
+                  // Check if the item has 'Add' or 'Either' and make the recursive call if needed
+                  if (item.Add || item.Either || item.Envelope) {
+                    processKeyValuePairs(item, parentKey); // Recursive call for nested 'Add' or 'Either'
+                  } else {
+                    // Directly push the item if it doesn't have 'Add' or 'Either'
+                    temp.push(item);
+                  }
+                }
+              });
+            } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
+              // If subArrayOrItem is a direct object (not an array)
+              const newObj = {};
+              // Loop through each property of the subArrayOrItem object
+              for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
+                newObj[itemKey] = itemValue; // Add each property to the new object
+                // If the object contains "Add" or "Either", process it again
+                if (itemKey === 'Add' || itemKey === 'Either' || itemKey === 'Envelope') {
+                  processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
                 }
               }
-            });
-          } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
-            // If subArrayOrItem is a direct object (not an array)
-            const newObj = {};
-            // Loop through each property of the subArrayOrItem object
-            for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
-              newObj[itemKey] = itemValue; // Add each property to the new object
-              // If the object contains "Add" or "Either", process it again
-              if (itemKey === 'Add' || itemKey === 'Either' || itemKey === 'Envelope') {
-                processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
-              }
+              // Push the new object into the temp array
+              temp.push(newObj);
+             } 
+            else {
+              // If the value is not an object, call processObject recursively
+              processObject(subArrayOrItem, parentKey);
             }
-            // Push the new object into the temp array
-            temp.push(newObj);
-           } 
-          else {
-            // If the value is not an object, call processObject recursively
-            processObject(subArrayOrItem, parentKey);
-          }
-        });
-        if (parentKey === 'Either' || (parentKey === 'Add' && firstKey === 'Either')) {
-          eitherArray.push(temp);
-        } else if (parentKey === 'Add' && (!firstKey || firstKey === 'Add')) {
-          addObj.push(temp);
-        } else if (parentKey === 'Envelope' || (parentKey === 'Add' && firstKey === 'Envelope')) {
-          envelopeObj.push(temp);
-        } }
-       else if (typeof value === 'object' && value !== null) {
-        processObject(value, key);
+          });
+          console.log("lastvalue",lastvalue);
+          secondLastKey = lastvalue.length > 1 ? lastvalue[lastvalue.length - 2] : null;
+          
+          if (parentKey === 'Either' || (parentKey === 'Add' && firstKey === 'Either')) {
+            eitherArray.push(temp);
+          } else if (parentKey === 'Add' && (!firstKey || firstKey === 'Add')) {
+            addObj.push(temp);
+          } else if (parentKey === 'Envelope' || (parentKey === 'Add' && firstKey === 'Envelope')) {
+            envelopeObj.push(temp);
+          } }
+         else if (typeof value === 'object' && value !== null) {
+          processObject(value, key);
+        }
       }
     }
-  }
   function removeDuplicates(arr) {
     const uniqueSet = new Set(arr.map(item => JSON.stringify(item)));
     return Array.from(uniqueSet).map(item => JSON.parse(item));
@@ -937,8 +947,8 @@ function multipleFactor(input) {
   eitherArray = multipleFactor(eitherArray);
   addObj = multipleFactor(addObj);
   envelopeObj = multipleFactor(envelopeObj);
-  console.log({ addObj, eitherArray, envelopeObj });
-  return { firstKey, eitherArray, addObj , envelopeObj };
+  console.log({ firstKey, addObj, eitherArray, envelopeObj });
+  return { secondLastKey, firstKey, eitherArray, addObj , envelopeObj };
 }
 
 function findStrengthCombinations(combinations) {
@@ -1493,7 +1503,7 @@ function join_factor(finalCombinations_sign) {
   };
 
   if (typeof finalCombinations_sign === 'object' && finalCombinations_sign !== null) {
-    const { addObj, eitherArray, envelopeObj,firstKey } = finalCombinations_sign;
+    const { addObj, eitherArray, envelopeObj,firstKey,secondLastKey } = finalCombinations_sign;
     let flattenedEitherArray = [], flattenedAddObj = [], flattenedEnvelopeObj = [];
 
     // Flatten eitherArray
@@ -1678,7 +1688,8 @@ function join_factor(finalCombinations_sign) {
       add: commonArray_add,
       either: commonArray_Either,
       envelope: commonArray_Envelope,
-      firstKey
+      firstKey,
+      secondLastKey
     };
   } else {
     console.error("finalCombinations_sign is not an object or is null:", finalCombinations_sign);
@@ -1691,7 +1702,7 @@ function join(factorCombinations) {
   const extractedFactorsStore = {};
   for (const combination of factorCombinations) {
     const join = [];
-    const { add, either, envelope,firstKey } = combination;
+    const { add, either, envelope,firstKey,secondLastKey } = combination;
     const eitherJoin = [];
     const envelopeJoin  = [];
     console.log(either);
@@ -1829,7 +1840,7 @@ function join(factorCombinations) {
         console.log(factorIndex);
         for (let i = 0; i < maxI; i++) {
           let factorCombinations = [];
-          if (firstKey === "Either" || firstKey === "Envelope") {
+          if (secondLastKey === "Either" || secondLastKey === "Envelope") {
             
             either.forEach(eitherArray => {
               if (Array.isArray(eitherArray)) {
@@ -1843,7 +1854,7 @@ function join(factorCombinations) {
               }
             });
             console.log(factorCombinations);
-          } else if (firstKey === "Add") {
+          } else if (secondLastKey === "Add") {
             factorCombinations = combineMatchingFactors(either, factorIndex, i);
             console.log(factorCombinations);
           }
@@ -2159,7 +2170,7 @@ console.log(joinedCombinations);
 }
 
 function permutation_sign(result11) {
-  const { addObj, eitherArray, envelopeObj, firstKey } = result11;
+  const { addObj, eitherArray, envelopeObj, firstKey, secondLastKey } = result11;
   let finalCombinations = [];
   
   function generateCombinations(arrays) {
@@ -2453,7 +2464,7 @@ function permutation_sign(result11) {
   }
   }
   console.log({ addObj, eitherArray, envelopeObj,firstKey });
-  return { addObj, eitherArray,envelopeObj ,firstKey};
+  return { addObj, eitherArray,envelopeObj ,firstKey,secondLastKey};
 }
 
 async function Generate_Load_Combination() {
