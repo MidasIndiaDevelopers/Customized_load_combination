@@ -388,7 +388,7 @@ function importLoadCombinationInput(data) {
 };
  
 function getLoadCaseFactors(loadCaseName, combinations) {
-  const cleanedLoadCaseName = loadCaseName.replace(/\s*\(CB\)$/, '');
+  const cleanedLoadCaseName = loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV)\)$/, '');
   for (const combo of combinations) {
     if (cleanedLoadCaseName === combo.loadCombination) {
       return combo;
@@ -419,13 +419,14 @@ function createNDimensionalArray(dimensions, fillValue = undefined) {
 function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 1, factorIndexArray = []) {
   // Initialize factorArray with dynamic dimensions
   let factorArray = createNDimensionalArray(dimension);
-  if (loadNames.includes(loadCases.loadCaseName)) {
+  const cleanedLoadCaseName = loadCases.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS)\)$/, '');
+  if (loadNames.includes(cleanedLoadCaseName)) {
     // If loadCaseName exists in loadNames
     for (let i = 1; i <= 5; i++) {
       const factorKey = `factor${i}`;
       let multipliedFactor = loadCases[factorKey] * value;
       if (i === factor) {
-        multipliedFactor = loadCases[factorKey] !== undefined ? loadCases[factorKey] * value : 1;
+        multipliedFactor = loadCases[factorKey] !== undefined && loadCases[factorKey] !== "" ? loadCases[factorKey] * value : 1;
       }
  if (dimension === 1) {
   // In 1D array, we simply set the value at the first index
@@ -478,7 +479,8 @@ else if (dimension > 2) {
             const currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
-            if (loadNames.includes(eitherLoadCase.loadCaseName)) {
+            const eitherLoadCaseName = eitherLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS)\)$/, '');
+            if (loadNames.includes(eitherLoadCaseName)) {
               if (factorIndex === 1) {
                 // Reinitialize factorArray for dynamic dimensions
                 factorArray = createNDimensionalArray(dimension);
@@ -551,7 +553,8 @@ else if (dimension > 2) {
             const currentFactorValue = addLoadCase[`factor${factorIndex}`];
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, addLoadCase.sign || '+');
-            if (loadNames.includes(addLoadCase.loadCaseName)) {
+            const addLoadCaseName = addLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS)\)$/, '');
+            if (loadNames.includes(addLoadCaseName)) {
               if (factorIndex === 1) {
                 factorArray = createNDimensionalArray(dimension);
                 for (let i = 1; i <= 5; i++) {
@@ -770,8 +773,10 @@ function multiplySigns(sign1, sign2) {
                   if (item.Add || item.Either || item.Envelope) {
                     processKeyValuePairs(item, parentKey); // Recursive call for nested 'Add' or 'Either'
                   } else {
-                    // Directly push the item if it doesn't have 'Add' or 'Either'
-                    temp.push(item);
+                    temp.push({
+                      ...item,
+                      previousKey: lastvalue.length > 0 ? lastvalue[lastvalue.length - 1] : null
+                  });
                   }
                 }
               });
@@ -786,8 +791,10 @@ function multiplySigns(sign1, sign2) {
                   processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
                 }
               }
-              // Push the new object into the temp array
-              temp.push(newObj);
+              temp.push({
+                ...newObj,
+                previousKey: lastvalue.length > 0 ? lastvalue[lastvalue.length - 1] : null
+            });
              } 
             else {
               // If the value is not an object, call processObject recursively
@@ -809,10 +816,6 @@ function multiplySigns(sign1, sign2) {
         }
       }
     }
-  function removeDuplicates(arr) {
-    const uniqueSet = new Set(arr.map(item => JSON.stringify(item)));
-    return Array.from(uniqueSet).map(item => JSON.parse(item));
-  }
   function arraysAreEqual(arr1, arr2) {
     if (arr1.length !== arr2.length) return false;
     for (let i = 0; i < arr1.length; i++) {
@@ -823,72 +826,76 @@ function multiplySigns(sign1, sign2) {
 
 function multipleFactor(input) {
   const addObj = [];
-  
+
   input.forEach((subArray, subArrayIndex) => {
-      let tempArray = [];  // Temporary array for the current subArray
-      let loadCaseNames = [];  // Store the loadCaseName of the current object
-      let additionalArray = [];  // Additional array to collect matches
+      let tempArray = []; // Temporary array for the current subArray
+      let loadCaseNames = []; // Store the loadCaseName of the current object
+      let additionalArray = []; // Additional array to collect matches
+
       subArray.forEach((item, itemIndex) => {
-          if (item === null) return; 
+          if (item === null) return;
           tempArray = [];
-          let temp = []; 
+          let temp = [];
+          let previousKey = item.previousKey || null; // Retrieve the previousKey
+
           if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
               Object.keys(item).forEach((key) => {
-                if (!isNaN(Number(key))) {
-                  // Extract loadCaseName, sign, and factor properties if the key is a number
-                  if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
-                      loadCaseNames.push(item[key].loadCaseName);
-                      temp.push({
-                          loadCaseName: item[key].loadCaseName,
-                          sign: item[key].sign,
-                          factor: item[key].factor,
-                      });
+                  if (!isNaN(Number(key))) {
+                      // Extract loadCaseName, sign, and factor properties if the key is a number
+                      if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
+                          loadCaseNames.push(item[key].loadCaseName);
+                          temp.push({
+                              loadCaseName: item[key].loadCaseName,
+                              sign: item[key].sign,
+                              factor: item[key].factor,
+                              previousKey, // Add previousKey to each entry
+                          });
+                      }
+                  } else {
+                      if (item.loadCaseName && item.sign && item.factor) {
+                          if (Array.isArray(item.factor)) {
+                              // Ensure factor values are numbers or undefined
+                              item.factor = item.factor.map((value) => (isNaN(value) ? undefined : value));
+                          }
+                          temp.push({
+                              loadCaseName: item.loadCaseName,
+                              sign: item.sign,
+                              factor: item.factor,
+                              previousKey, // Add previousKey to each entry
+                          });
+                      }
                   }
-              } else {
-                if (item.loadCaseName && item.sign && item.factor) {
-                  // Check if item.factor is an array
-                  if (Array.isArray(item.factor)) {
-                      // Iterate over each value in the factor array
-                      item.factor = item.factor.map(value => {
-                          // If value is NaN, replace it with undefined
-                          return isNaN(value) ? undefined : value;
-                      });
-                  }
-                  
-                  // Now push the item to temp
-                  temp.push({
-                      loadCaseName: item.loadCaseName,
-                      sign: item.sign,
-                      factor: item.factor,
-                  });
-              }
-              }
               });
           }
           tempArray.push(temp);
+
           for (let nextIndex = itemIndex + 1; nextIndex < subArray.length; nextIndex++) {
               let nextItem = subArray[nextIndex];
-              if (nextItem === null) continue;  // Skip already processed items
-              
+              if (nextItem === null) continue;
+
               let loadCaseName_temp = [];
               if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
                   Object.keys(nextItem).forEach((nextKey) => {
-                      // Extract and store next item's loadCaseName
                       if (nextItem[nextKey] && nextItem[nextKey].loadCaseName) {
                           loadCaseName_temp.push(nextItem[nextKey].loadCaseName);
                       }
                   });
               }
               if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
-                  // If loadCaseNames match, push both into additionalArray
                   let matchArray = [];
-                  temp = []; 
+                  temp = [];
                   Object.keys(nextItem).forEach((nextKey) => {
-                      if (nextItem[nextKey] && nextItem[nextKey].loadCaseName && nextItem[nextKey].sign && nextItem[nextKey].factor) {
+                      if (
+                          nextItem[nextKey] &&
+                          nextItem[nextKey].loadCaseName &&
+                          nextItem[nextKey].sign &&
+                          nextItem[nextKey].factor
+                      ) {
                           temp.push({
                               loadCaseName: nextItem[nextKey].loadCaseName,
                               sign: nextItem[nextKey].sign,
                               factor: nextItem[nextKey].factor,
+                              previousKey: nextItem.previousKey || null, // Preserve the next item's previousKey
                           });
                       }
                   });
@@ -896,14 +903,14 @@ function multipleFactor(input) {
                   subArray[nextIndex] = null;
               }
           }
+
           for (let nextSubArrayIndex = subArrayIndex + 1; nextSubArrayIndex < input.length; nextSubArrayIndex++) {
               let nextSubArray = input[nextSubArrayIndex];
 
               nextSubArray.forEach((nextItem, nextItemIndex) => {
-                  if (nextItem === null) return;  // Skip already processed items
+                  if (nextItem === null) return;
 
                   let loadCaseName_temp = [];
-
                   if (typeof nextItem === 'object' && nextItem !== null && Object.keys(nextItem).length > 0) {
                       Object.keys(nextItem).forEach((nextKey) => {
                           if (nextItem[nextKey] && nextItem[nextKey].loadCaseName) {
@@ -912,19 +919,21 @@ function multipleFactor(input) {
                       });
                   }
 
-                  // Compare the current loadCaseNames with the next sub-array item
                   if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
-                      // If they match, add both to additionalArray
                       let matchArray = [];
-                      // matchArray.push(temp);
-                      temp = [];  // Clear temp for the next item
-
+                      temp = [];
                       Object.keys(nextItem).forEach((nextKey) => {
-                          if (nextItem[nextKey] && nextItem[nextKey].loadCaseName && nextItem[nextKey].sign && nextItem[nextKey].factor) {
+                          if (
+                              nextItem[nextKey] &&
+                              nextItem[nextKey].loadCaseName &&
+                              nextItem[nextKey].sign &&
+                              nextItem[nextKey].factor
+                          ) {
                               temp.push({
                                   loadCaseName: nextItem[nextKey].loadCaseName,
                                   sign: nextItem[nextKey].sign,
                                   factor: nextItem[nextKey].factor,
+                                  previousKey: nextItem.previousKey || null, // Preserve the next item's previousKey
                               });
                           }
                       });
@@ -933,14 +942,17 @@ function multipleFactor(input) {
                   }
               });
           }
+
           additionalArray.push(tempArray);
           loadCaseNames = [];
       });
+
       addObj.push(additionalArray.length > 0 ? additionalArray : tempArray);
   });
-  console.log(addObj);
+
   return addObj;
 }
+
   processObject(inputObj);
   console.log(eitherArray);
   console.log(addObj);
@@ -1086,12 +1098,20 @@ console.log(joinedCombinations);
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
         // Prepare the vCOMB structure for this combination
         let vCOMB = combArray.map((comb) => {
-          // Search for the matching key in loadNames_key
-          const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
-          const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+          const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS)\)$/, '');;
+          // Extract the value inside the parentheses if present
+  const match = comb.loadCaseName.match(/\((CB|ST|CS|CBC|MV|SM|RS)\)$/);
+
+  // Use the value from parentheses if present, otherwise derive from loadNames_key
+  const analysisType = match
+    ? match[1] // Use the value in parentheses (e.g., CB, ST, CS, CBC)
+    : (() => {
+        const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
+        return matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+      })();
           return {
             "ANAL": analysisType,
-            "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
+            "LCNAME": cleanedLoadCaseName, // Assuming comb has a property `loadCaseName`
             "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
           };
         });
@@ -1120,12 +1140,20 @@ console.log(joinedCombinations);
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
         // Prepare the vCOMB structure for this combination
         let vCOMB = combArray.map((comb) => {
-          // Search for the matching key in loadNames_key
-          const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
-          const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+          const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS)\)$/, '');;
+          // Extract the value inside the parentheses if present
+  const match = comb.loadCaseName.match(/\((CB|ST|CS|CBC|MV|SM|RS)\)$/);
+
+  // Use the value from parentheses if present, otherwise derive from loadNames_key
+  const analysisType = match
+    ? match[1] // Use the value in parentheses (e.g., CB, ST, CS, CBC)
+    : (() => {
+        const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
+        return matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+      })();
           return {
             "ANAL": analysisType,
-            "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
+            "LCNAME": cleanedLoadCaseName, // Assuming comb has a property `loadCaseName`
             "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
           };
         });
@@ -1534,29 +1562,32 @@ function join_factor(finalCombinations_sign) {
     if (Array.isArray(addObj) && addObj.length > 0) {
       addObj.forEach(mainArray => {
         if (Array.isArray(mainArray)) {
+          // Wrap each mainArray into a separate array
+          let mainArrayGroup = []; 
+          
           let combinedArray = [];
           if (mainArray.length === 1) {
             const currentArray = mainArray[0];
             if (currentArray.length === 1 && Array.isArray(currentArray[0]) && currentArray[0].every(item => !Array.isArray(item))) {
               combinedArray.push(currentArray);
-              flattenedAddObj.push([...deepFlatten(combinedArray)]);
+              mainArrayGroup.push([...deepFlatten(combinedArray)]);
               combinedArray = [];
             } else {
               if (currentArray.length > 0) {
-              const length = currentArray[0].length;
-              for (let i = 0; i < length; i++) {
-                let combinedArray = [];
-                currentArray.forEach(subArray => {
-                  if (Array.isArray(subArray) && subArray[i]) {
-                    combinedArray.push(subArray[i]);
-                  } else {
-                    combinedArray.push(subArray);
-                  }
-                });
-                flattenedAddObj.push([...deepFlatten(combinedArray)]);
-                combinedArray = [];
+                const length = currentArray[0].length;
+                for (let i = 0; i < length; i++) {
+                  let combinedArray = [];
+                  currentArray.forEach(subArray => {
+                    if (Array.isArray(subArray) && subArray[i]) {
+                      combinedArray.push(subArray[i]);
+                    } else {
+                      combinedArray.push(subArray);
+                    }
+                  });
+                  mainArrayGroup.push([...deepFlatten(combinedArray)]);
+                  combinedArray = [];
+                }
               }
-            }
             }
           } else {
             mainArray.forEach(currentArray => {
@@ -1570,17 +1601,19 @@ function join_factor(finalCombinations_sign) {
                       combinedArray.push(subArray[i]);
                     }
                   });
-                  flattenedAddObj.push([...deepFlatten(combinedArray)]);
+                  mainArrayGroup.push([...deepFlatten(combinedArray)]);
                   combinedArray = [];
                 }
               }
             });
-            
           }
+          
+          // Push the processed mainArrayGroup into flattenedAddObj
+          flattenedAddObj.push(mainArrayGroup);
         }
       });
     }
-
+    
     // Flatten envelopeObj
     if (Array.isArray(envelopeObj)) {
       envelopeObj.forEach(arr => {
@@ -1615,7 +1648,8 @@ function join_factor(finalCombinations_sign) {
             combinedResult[key] = {
               loadCaseName: item.loadCaseName,
               sign: item.sign,
-              factor: []
+              factor: [],
+              previousKey: item.previousKey
             };
           }
           mergeFactors(combinedResult[key].factor, item.factor);
@@ -1645,7 +1679,17 @@ function join_factor(finalCombinations_sign) {
     };
 
     // Final common arrays
-    const commonArray_add = flattenedAddObj.map(item => [combineFactors(Array.isArray(item) ? item : [item])]);
+    const commonArray_add = flattenedAddObj.map(mainArray => {
+      // Check if mainArray is valid (not empty and is an array)
+      if (Array.isArray(mainArray) && mainArray.length > 0) {
+        // Process each subarray in the mainArray
+        return mainArray.map(subArray => {
+          // Check if subArray is valid before applying combineFactors
+          return Array.isArray(subArray) ? combineFactors([subArray]) : subArray;
+        });
+      } else {
+      }
+    });
     const commonArray_Either = flattenedEitherArray.map(item => {
       if (Array.isArray(item)) {
         return item.map(subArray => combineFactors(Array.isArray(subArray) ? subArray : [subArray]));
@@ -1747,16 +1791,16 @@ function join(factorCombinations) {
       const extractedFactors = either.flatMap(arr => {
         if (Array.isArray(arr) && arr.length > 1) {
           // Split each subarray into separate arrays
-          return arr.flatMap(subArray => {
-            const flattenedArr = Array.isArray(subArray) ? subArray.flat() : [subArray];
-            return flattenedArr.flatMap(factorObj => {
-              if (Array.isArray(factorObj)) {
-                return factorObj.map(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
-              } else {
-                return [extractFactorsFromObject(factorObj, factorIndex, i)];
-              }
+            return arr.flatMap(subArray => {
+              const flattenedArr = Array.isArray(subArray) ? subArray.flat() : [subArray];
+              return flattenedArr.flatMap(factorObj => {
+                if (Array.isArray(factorObj)) {
+                  return factorObj.map(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
+                } else {
+                  return [extractFactorsFromObject(factorObj, factorIndex, i)];
+                }
+              });
             });
-          });
         } else {
           // Handle arrays with a single element or non-array elements
           const flattenedArr = Array.isArray(arr) ? arr.flat() : [arr];
@@ -1840,7 +1884,7 @@ function join(factorCombinations) {
         console.log(factorIndex);
         for (let i = 0; i < maxI; i++) {
           let factorCombinations = [];
-          if (secondLastKey === "Either" || secondLastKey === "Envelope") {
+          if (firstKey === "Either" || firstKey === "Envelope") {
             
             either.forEach(eitherArray => {
               if (Array.isArray(eitherArray)) {
@@ -1854,7 +1898,7 @@ function join(factorCombinations) {
               }
             });
             console.log(factorCombinations);
-          } else if (secondLastKey === "Add") {
+          } else if (firstKey === "Add") {
             factorCombinations = combineMatchingFactors(either, factorIndex, i);
             console.log(factorCombinations);
           }
@@ -3031,7 +3075,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
     <Scrollbars height={150} width="100%"> {/* Applying the Scrollbars component */}
       {/* <Stack spacing={1}> */}
         {[
-          ...loadNames_key.map((item) => `${item.name} (${item.key})`), 
+          ...loadNames_key.map((item) => `${item.name}(${item.key})`), 
            ...loadCombinations.map((combination) => combination.loadCombination)
   ]
   .filter((name, nameIndex) => nameIndex !== selectedLoadCombinationIndex) // Filter out the name at the current index
