@@ -748,74 +748,98 @@ function multiplySigns(sign1, sign2) {
         processKeyValuePairs(obj, parentKey);
       }
     }
-    function processKeyValuePairs(obj, parentKey) {
-      
+    function processKeyValuePairs(obj, parentKey, keyStack = []) {
+      // Maintain a stack to track the hierarchy of keys
+      if (parentKey) keyStack.push(parentKey);
+    
       // Loop through each key-value pair in the object
       for (const [key, value] of Object.entries(obj)) {
         if (!firstKey) {
           firstKey = key;
         }
-        if (key === 'Add' || key === 'Either' || key === 'Envelope') {
+    
+        // Update parentKey if the current key is "Add", "Either", or "Envelope"
+        if (key === "Add" || key === "Either" || key === "Envelope") {
           parentKey = key;
+          keyStack.push(key);
         }
+    
         // Push the current parentKey into the lastvalue array
-    if (parentKey) {
-      lastvalue.push(parentKey);
-    }
+        if (keyStack.length > 1) {
+          // Push the second-to-last key (one level up) into lastvalue
+          lastvalue.push(keyStack[keyStack.length - 2]);
+        }
+    
         if (Array.isArray(value)) {
           let temp = [];
           value.forEach((subArrayOrItem) => {
             if (Array.isArray(subArrayOrItem)) {
-              // If the current value is a nested array, loop through the inner array
+              // Process nested arrays
               subArrayOrItem.forEach((item) => {
-                if (typeof item === 'object' && item !== null && Object.keys(item).length > 0) {
-                  // Check if the item has 'Add' or 'Either' and make the recursive call if needed
+                if (typeof item === "object" && item !== null && Object.keys(item).length > 0) {
+                  // Check if the item has "Add", "Either", or "Envelope"
                   if (item.Add || item.Either || item.Envelope) {
-                    processKeyValuePairs(item, parentKey); // Recursive call for nested 'Add' or 'Either'
+                    processKeyValuePairs(item, parentKey, [...keyStack]); // Recursive call
+                  } else {
+                    if (parentKey == "Either") {
+                    temp.push({
+                      ...item,
+                      previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 2] : null, // Second-to-last key
+                    });
                   } else {
                     temp.push({
                       ...item,
-                      previousKey: lastvalue.length > 0 ? lastvalue[lastvalue.length - 1] : null
-                  });
+                      previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 3] : null, // Second-to-last key
+                    });
+                  }
                   }
                 }
               });
-            } else if (typeof subArrayOrItem === 'object' && subArrayOrItem !== null) {
-              // If subArrayOrItem is a direct object (not an array)
+            } else if (typeof subArrayOrItem === "object" && subArrayOrItem !== null) {
+              // Handle direct objects in the array
               const newObj = {};
-              // Loop through each property of the subArrayOrItem object
               for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
-                newObj[itemKey] = itemValue; // Add each property to the new object
-                // If the object contains "Add" or "Either", process it again
-                if (itemKey === 'Add' || itemKey === 'Either' || itemKey === 'Envelope') {
-                  processKeyValuePairs(subArrayOrItem, parentKey); // Recursive call
+                newObj[itemKey] = itemValue;
+                if (itemKey === "Add" || itemKey === "Either" || itemKey === "Envelope") {
+                  processKeyValuePairs(subArrayOrItem, parentKey, [...keyStack]); // Recursive call
                 }
               }
-              temp.push({
-                ...newObj,
-                previousKey: lastvalue.length > 0 ? lastvalue[lastvalue.length - 1] : null
-            });
-             } 
-            else {
-              // If the value is not an object, call processObject recursively
-              processObject(subArrayOrItem, parentKey);
+              if (parentKey == "Either") {
+                temp.push({
+                  ...item,
+                  previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 2] : null, // Second-to-last key
+                });
+              } else {
+                temp.push({
+                  ...item,
+                  previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 3] : null, // Second-to-last key
+                });
+              }
+            } else {
+              processObject(subArrayOrItem, parentKey, [...keyStack]);
             }
           });
-          console.log("lastvalue",lastvalue);
-          secondLastKey = lastvalue.length > 1 ? lastvalue[lastvalue.length - 2] : null;
-          
-          if (parentKey === 'Either' || (parentKey === 'Add' && firstKey === 'Either')) {
+    
+          // Update secondLastKey and handle specific cases
+          console.log("lastvalue", lastvalue);
+          secondLastKey = keyStack.length > 1 ? keyStack[keyStack.length - 2] : null;
+    
+          if (parentKey === "Either" || (parentKey === "Add" && firstKey === "Either")) {
             eitherArray.push(temp);
-          } else if (parentKey === 'Add' && (!firstKey || firstKey === 'Add')) {
+          } else if (parentKey === "Add" && (!firstKey || firstKey === "Add")) {
             addObj.push(temp);
-          } else if (parentKey === 'Envelope' || (parentKey === 'Add' && firstKey === 'Envelope')) {
+          } else if (parentKey === "Envelope" || (parentKey === "Add" && firstKey === "Envelope")) {   
             envelopeObj.push(temp);
-          } }
-         else if (typeof value === 'object' && value !== null) {
-          processObject(value, key);
+          }
+        } else if (typeof value === "object" && value !== null) {
+          processObject(value, key, [...keyStack]); // Recursive call
         }
       }
+    
+      // Clean up the stack to maintain context
+      if (parentKey) keyStack.pop();
     }
+    
   function arraysAreEqual(arr1, arr2) {
     if (arr1.length !== arr2.length) return false;
     for (let i = 0; i < arr1.length; i++) {
@@ -1667,16 +1691,34 @@ function join_factor(finalCombinations_sign) {
 
     const processFactorsArray = (commonArray) => {
       commonArray.forEach(itemArray => {
-        itemArray.forEach(subArray => {
-          Object.keys(subArray).forEach(key => {
-            const factor = subArray[key].factor;
-            if (Array.isArray(factor)) {
-              subArray[key].factor = normalizeFactors(factor);
-            }
+        // Check if itemArray is neither undefined nor an empty string
+        if (itemArray && typeof itemArray !== 'string') {
+          itemArray.forEach(subArray => {
+            Object.keys(subArray).forEach(key => {
+              // Check if the key is a number
+              if (!isNaN(parseInt(key, 10))) {
+                // If key is a number, go deeper into its nested key-value pairs
+                const nestedObj = subArray[key];
+                Object.keys(nestedObj).forEach(nestedKey => {
+                  const factor = nestedObj[nestedKey].factor;
+                  if (Array.isArray(factor)) {
+                    nestedObj[nestedKey].factor = normalizeFactors(factor);
+                  }
+                });
+              } else {
+                // Follow the current process for non-integer keys
+                const factor = subArray[key].factor;
+                if (Array.isArray(factor)) {
+                  subArray[key].factor = normalizeFactors(factor);
+                }
+              }
+            });
           });
-        });
+        }
       });
     };
+    
+    
 
     // Final common arrays
     const commonArray_add = flattenedAddObj.map(mainArray => {
@@ -1685,7 +1727,7 @@ function join_factor(finalCombinations_sign) {
         // Process each subarray in the mainArray
         return mainArray.map(subArray => {
           // Check if subArray is valid before applying combineFactors
-          return Array.isArray(subArray) ? combineFactors([subArray]) : subArray;
+          return Array.isArray(subArray) ? [combineFactors(subArray)] : subArray;
         });
       } else {
       }
@@ -1906,28 +1948,52 @@ function join(factorCombinations) {
           add.forEach(addArray => {
             if (Array.isArray(addArray) && addArray.length > 0) {
               factorCombinations.forEach(factorCombination => {
-                let combinedResult = []
                 const addresult = [];
+                
                 addArray.forEach(item => {
                   Object.keys(item).forEach(key => {
-                    const value = item[key];
-                    const loadCaseName = value.loadCaseName;
-                    const sign = value.sign;
-                    const factor = value.factor;
-                    const factorValue = getSingleFactor(factor, factorIndex, i);
+                    // Declare combinedResult inside this loop for each iteration
+                    let combinedResult = [];
                     
-                    if (factorValue !== undefined && factorValue !== null) {
-                      combinedResult.push({ loadCaseName, sign, factor: factorValue });
+                    // Check if the key is a number
+                    if (!isNaN(parseInt(key, 10))) {
+                      // If the key is a number, go deeper into its nested structure
+                      const nestedObj = item[key];
+                      Object.keys(nestedObj).forEach(nestedKey => {
+                        const nestedValue = nestedObj[nestedKey];
+                        const loadCaseName = nestedValue.loadCaseName;
+                        const sign = nestedValue.sign;
+                        const factor = nestedValue.factor;
+                        const factorValue = getSingleFactor(factor, factorIndex, i);
+          
+                        if (factorValue !== undefined && factorValue !== null) {
+                          combinedResult.push({ loadCaseName, sign, factor: factorValue });
+                        }
+                      });
+                    } else {
+                      // Follow the current process for non-numeric keys
+                      const value = item[key];
+                      const loadCaseName = value.loadCaseName;
+                      const sign = value.sign;
+                      const factor = value.factor;
+                      const factorValue = getSingleFactor(factor, factorIndex, i);
+          
+                      if (factorValue !== undefined && factorValue !== null) {
+                        combinedResult.push({ loadCaseName, sign, factor: factorValue });
+                      }
+                    }
+          
+                    // If combinedResult has data, push it along with factorCombination into allCombinations
+                    if (combinedResult.length > 0) {
+                      combinedResult.push(...factorCombination);
+                      allCombinations.push(combinedResult);
                     }
                   });
                 });
-                if (combinedResult.length > 0) {
-                  combinedResult.push(...factorCombination);
-                  allCombinations.push(combinedResult);
-                }
               });
             }
           });
+          
           const nonEmptyFactorCombinations = factorCombinations.filter(factor => factor.length > 0);
           if (add.length === 0 && nonEmptyFactorCombinations.length > 0) {
             allCombinations.push(...factorCombinations);
@@ -2056,36 +2122,56 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
     }
     // This will store the addmultiResult for the current factorIndex and i
     addresult[factorIndex][i] = [];
-    
-    // Iterate over add array
     add.forEach(addArray => {
       if (Array.isArray(addArray) && addArray.length > 0) {
-        let addmultiResult = [];  // To store the combination for this addArray, factorIndex, and i
-        
+        let addmultiResult = []; // To store the combination for this addArray, factorIndex, and i
+    
         // Loop over each item in the addArray
         addArray.forEach(item => {
           Object.keys(item).forEach(key => {
-            const value = item[key];
-            const loadCaseName = value.loadCaseName;
-            const sign = value.sign;
-            const factor = value.factor;
-            
-            // Get the factor value using the function
-            const factorValue = getSingleFactor(factor, factorIndex, i);
-            
-            // Check if the factorValue is valid
-            if (factorValue !== undefined && factorValue !== null) {
-              addmultiResult.push({ loadCaseName, sign, factor: factorValue });
+            // Check if the key is a number
+            if (!isNaN(parseInt(key, 10))) {
+              // If the key is a number, go deeper into its nested structure
+              const nestedObj = item[key];
+              Object.keys(nestedObj).forEach(nestedKey => {
+                const nestedValue = nestedObj[nestedKey];
+                const loadCaseName = nestedValue.loadCaseName;
+                const sign = nestedValue.sign;
+                const factor = nestedValue.factor;
+    
+                // Get the factor value using the function
+                const factorValue = getSingleFactor(factor, factorIndex, i);
+    
+                // Check if the factorValue is valid
+                if (factorValue !== undefined && factorValue !== null) {
+                  addmultiResult.push({ loadCaseName, sign, factor: factorValue });
+                }
+              });
+            } else {
+              // Follow the current process for non-numeric keys
+              const value = item[key];
+              const loadCaseName = value.loadCaseName;
+              const sign = value.sign;
+              const factor = value.factor;
+    
+              // Get the factor value using the function
+              const factorValue = getSingleFactor(factor, factorIndex, i);
+    
+              // Check if the factorValue is valid
+              if (factorValue !== undefined && factorValue !== null) {
+                addmultiResult.push({ loadCaseName, sign, factor: factorValue });
+              }
             }
           });
         });
-        
+    
         // Only push the result if there are items in addmultiResult
         if (addmultiResult.length > 0) {
-          addresult[factorIndex][i].push(addmultiResult);  // Store result for the current factorIndex and i
+          addresult[factorIndex][i].push(addmultiResult); // Store result for the current factorIndex and i
         }
       }
     });
+    
   }
 }
 console.log(addresult);
@@ -2151,46 +2237,78 @@ console.log(joinedCombinations);
           add.forEach(addArray => {
             // Variable to hold combinations for each addArray separately
             let subArrayCombination = [];
-    
+          
             if (Array.isArray(addArray) && addArray.length > 0) {
               addArray.forEach(item => {
                 Object.keys(item).forEach(key => {
-                  const value = item[key];
-                  const loadCaseName = value.loadCaseName;
-                  const sign = value.sign;
-                  const factor = value.factor[factorIndex];
-                  let factorValue;
-    
-                  if (Array.isArray(factor)) {
-                    factorValue = getSingleFactor(factor, factorIndex, i);
+                  // Check if the key is an integer
+                  if (!isNaN(parseInt(key, 10))) {
+                    // If the key is an integer, go deeper into its nested key-value pairs
+                    const nestedObj = item[key];
+                    Object.keys(nestedObj).forEach(nestedKey => {
+                      const value = nestedObj[nestedKey];
+                      const loadCaseName = value.loadCaseName;
+                      const sign = value.sign;
+                      const factor = value.factor[factorIndex];
+                      let factorValue;
+          
+                      if (Array.isArray(factor)) {
+                        factorValue = getSingleFactor(factor, factorIndex, i);
+                      } else {
+                        factorValue = factor;
+                      }
+          
+                      // Check if factorValue is valid and non-zero, then push it into subArrayCombination
+                      if (factorValue !== undefined) {
+                        const combinedResult = { loadCaseName, sign, factor: factorValue };
+                        subArrayCombination.push(combinedResult);
+          
+                        if (!Array.isArray(factor)) {
+                          // Set the flag to true for non-array factors and exit inner loops
+                          shouldBreak = true;
+                          return; // Exit the innermost loop
+                        }
+                      }
+                    });
                   } else {
-                    factorValue = factor;
-                  }
-    
-                  // Check if factorValue is valid and non-zero, then push it into subArrayCombination
-                  if (factorValue !== undefined) {
-                    const combinedResult = { loadCaseName, sign, factor: factorValue };
-                    subArrayCombination.push(combinedResult);
-    
-                    if (!Array.isArray(factor)) {
-                      // Set the flag to true for non-array factors and exit inner loops
-                      shouldBreak = true;
-                      return; // Exit the innermost loop
+                    // Follow the current process for non-integer keys
+                    const value = item[key];
+                    const loadCaseName = value.loadCaseName;
+                    const sign = value.sign;
+                    const factor = value.factor[factorIndex];
+                    let factorValue;
+          
+                    if (Array.isArray(factor)) {
+                      factorValue = getSingleFactor(factor, factorIndex, i);
+                    } else {
+                      factorValue = factor;
+                    }
+          
+                    // Check if factorValue is valid and non-zero, then push it into subArrayCombination
+                    if (factorValue !== undefined) {
+                      const combinedResult = { loadCaseName, sign, factor: factorValue };
+                      subArrayCombination.push(combinedResult);
+          
+                      if (!Array.isArray(factor)) {
+                        // Set the flag to true for non-array factors and exit inner loops
+                        shouldBreak = true;
+                        return; // Exit the innermost loop
+                      }
                     }
                   }
                 });
               });
             }
-    
+          
             // After processing the entire addArray, add subArrayCombination to allCombinations
             if (subArrayCombination.length > 0) {
               allCombinations.push(subArrayCombination);
             }
-    
+          
             if (shouldBreak) {
               return; // Break out of the forEach loop as well
             }
-          });
+          });          
     
           // Push allCombinations to combined if it has entries
           if (allCombinations.length > 0) {
