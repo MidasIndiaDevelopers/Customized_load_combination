@@ -10,14 +10,12 @@ import { useSnackbar, SnackbarProvider } from "notistack";
 import { Panel } from '@midasit-dev/moaui';
 import { Typography } from '@midasit-dev/moaui';
 import ComponentsPanelTypographyDropList from './Components/ComponentsPanelTypographyDropList';
-import ComponentsButtonLoading from './Components/ComponentsButtonLoading';
 import { Scrollbars } from '@midasit-dev/moaui';
 import ComponentsDialogHelpIconButton from './Components/ComponentsDialogHelpIconButton';
 import { midasAPI } from "./Function/Common";
 import { VerifyUtil, VerifyDialog } from "@midasit-dev/moaui";
 import ExcelJS from 'exceljs';  
 import { saveAs } from 'file-saver';
-import { extractProtocolDomainPort } from '@midasit-dev/moaui/Authentication/VerifyUtil';
 
 function App() {
 const [selectedLoadCombinationIndex, setSelectedLoadCombinationIndex] = useState(-1);
@@ -488,9 +486,6 @@ else if (dimension > 2) {
                   const factorKey = `factor${i}`;
                   let multipliedFactor = eitherLoadCase[factorKey] * value;
                   multipliedFactor = eitherLoadCase[factorKey] !== undefined && eitherLoadCase[factorKey] !== "" ? eitherLoadCase[factorKey] * value : undefined;
-                  // const previousFactor = factorIndexArray.length > 0 ? factorIndexArray[factorIndexArray.length - 1 -1] - 1: i - 1;
-                  // const indices = [i - 1, factor - 1].concat(new Array(dimension - 2).fill(previousFactor)); // Adjust for `n` dimensions
-                  // Remove the last value from factorIndexArray
  // Handling dimension 1
  if (dimension === 1) {
   // In 1D array, we simply set the value at the first index
@@ -1200,12 +1195,9 @@ console.log(joinedCombinations);
     
       const combinationName = `${comb_name}_Env`;
       let allVCombEntries = [];
-      // console.log("BACKUP",backupCivilCom);
-      // Loop through each combination entry in civilCom.Assign
       for (const key in backupCivilCom.Assign) {
         const assignEntry = backupCivilCom.Assign[key];
         if (assignEntry) {
-          // Extract the name part before the underscore
           let endpoint = '';
           let check = '';
           switch (selectedDropListValue) {
@@ -1224,8 +1216,8 @@ console.log(joinedCombinations);
           }
           
           const vCombObject = {
-            "ANAL": endpoint,  // Using ANAL from the first entry in vCOMB if available, else default to "ST"
-            "LCNAME": assignEntry.NAME,  // Storing just the base name (before the underscore)
+            "ANAL": endpoint,  
+            "LCNAME": assignEntry.NAME,
             "FACTOR": 1
           };
           allVCombEntries.push(vCombObject);
@@ -1785,7 +1777,7 @@ function join_factor(finalCombinations_sign) {
 
 function join(factorCombinations) {
   const joinArray = [];
-  const extractedFactorsStore = {};
+  let extractedFactorsStore = {};
   for (const combination of factorCombinations) {
     const join = [];
     const { add, either, envelope,firstKey,secondLastKey } = combination;
@@ -1857,14 +1849,14 @@ function join(factorCombinations) {
       });
     
       // Restructure to split subarrays into individual arrays
-      const correctedOutput = extractedFactors.flatMap(subArray =>
-        Array.isArray(subArray) ? subArray.map(item => [item]) : [[subArray]]
-      );
+      // const correctedOutput = extractedFactors.flatMap(subArray =>
+      //   Array.isArray(subArray) ? subArray.map(item => [item]) : [[subArray]]
+      // );
     
       if (!extractedFactorsStore[factorIndex]) {
         extractedFactorsStore[factorIndex] = [];
       }
-      extractedFactorsStore[factorIndex][i] = correctedOutput;
+      extractedFactorsStore[factorIndex][i] = extractedFactors;
     
       function generateCombinations(arrays, temp = [], index = 0) {
         // const filteredArrays = arrays.filter(array => Array.isArray(array) && array.length > 0);
@@ -1944,15 +1936,15 @@ function join(factorCombinations) {
                     if (allHaveSamePreviousKey && Object.values(eitherArray[0])[0]?.previousKey === "Either") {
                         const separatedArrays = eitherArray.map(obj => [obj]); // Break into separate arrays
                         modifiedArray.push(...separatedArrays); // Push separated arrays to modifiedArray
-                        return []; // Return an empty array as we've handled this case
+                       
                     } else if (eitherArray.length === 1) {
                         // Directly push the array to nonModifiedArray if length is 1
                         nonModifiedArray.push(eitherArray);
-                        return [];
+
                     }
                 }
                 return eitherArray;
-            }).flat(); // Flatten to handle the separated arrays (if any)
+            }); // Flatten to handle the separated arrays (if any)
         
             // Combine one array from modifiedArray with all arrays from nonModifiedArray
             let combinedArrays = [];
@@ -1980,7 +1972,7 @@ function join(factorCombinations) {
         
             // Manipulate the `either` object before processing
             const modifiedEither = either.map(eitherArray => {
-                if (Array.isArray(eitherArray) && eitherArray.length > 0) {
+                if (Array.isArray(eitherArray) && eitherArray.length > 1) {
                     // Check if all inner objects have the same `previousKey`
                     const allHaveSamePreviousKey = eitherArray.every(obj => {
                         const previousKeys = Object.values(obj).map(innerObj => innerObj?.previousKey);
@@ -1991,17 +1983,16 @@ function join(factorCombinations) {
                     if (allHaveSamePreviousKey && Object.values(eitherArray[0])[0]?.previousKey === "Either") {
                         const separatedArrays = eitherArray.map(obj => [obj]); // Break into separate arrays
                         modifiedArray.push(...separatedArrays); // Push separated arrays to modifiedArray
-                        return []; // Return an empty array as we've handled this case
+                         // Return an empty array as we've handled this case
                     } 
                 }
-                else if (eitherArray.length === 1) {
-                  // Directly push the array to nonModifiedArray if length is 1
-                  nonModifiedArray.push(eitherArray);
-                  return [];
+                else if (
+                  eitherArray.length === 1
+                ) {
+                  nonModifiedArray.push(eitherArray);  
               }
-                return eitherArray;
-            }).flat(); // Flatten to handle the separated arrays (if any)
-        
+            }); // Flatten to handle the separated arrays (if any)
+            console.log("nonModifiedArray", nonModifiedArray)
             // Combine one array from modifiedArray with all arrays from nonModifiedArray
             let combinedArrays = [];
         
@@ -2133,8 +2124,6 @@ function getCustomCombinations(arrays,arrays_1) {
 // Outer loop iterating over j
 for (let j = 0; j < 5; j++) {
   let iterationArray = [];
-
-  // Nested loop over i, treating it as the primary fixed element array
   for (let i = 0; i < 5; i++) {
     const baseInnerArray = extractedValues[i][j]; // Array for the fixed element
     const fixedElement = baseInnerArray[0]; // First element of i-th array for fixed position
@@ -2211,6 +2200,7 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
     
         // Loop over each item in the addArray
         addArray.forEach(item => {
+          addmultiResult = [];
           Object.keys(item).forEach(key => {
             // Check if the key is a number
             if (!isNaN(parseInt(key, 10))) {
@@ -2246,12 +2236,10 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
               }
             }
           });
+          if (addmultiResult.length > 0) {
+            addresult[factorIndex][i].push(addmultiResult); // Store result for the current factorIndex and i
+          }
         });
-    
-        // Only push the result if there are items in addmultiResult
-        if (addmultiResult.length > 0) {
-          addresult[factorIndex][i].push(addmultiResult); // Store result for the current factorIndex and i
-        }
       }
     });
     
