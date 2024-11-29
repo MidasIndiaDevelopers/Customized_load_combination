@@ -758,7 +758,6 @@ function multiplySigns(sign1, sign2) {
           parentKey = key;
           keyStack.push(key);
         }
-    
         // Push the current parentKey into the lastvalue array
         if (keyStack.length > 1) {
           // Push the second-to-last key (one level up) into lastvalue
@@ -768,54 +767,89 @@ function multiplySigns(sign1, sign2) {
         if (Array.isArray(value)) {
           let temp = [];
           value.forEach((subArrayOrItem) => {
-            if (Array.isArray(subArrayOrItem)) {
-              // Process nested arrays
-              subArrayOrItem.forEach((item) => {
-                if (typeof item === "object" && item !== null && Object.keys(item).length > 0) {
-                  // Check if the item has "Add", "Either", or "Envelope"
-                  if (item.Add || item.Either || item.Envelope) {
-                    processKeyValuePairs(item, parentKey, [...keyStack]); // Recursive call
+            if (Array.isArray(value)) {
+              let temp = [];
+              value.forEach((subArrayOrItem) => {
+                if (Array.isArray(subArrayOrItem)) {
+                  // Process nested arrays
+                  subArrayOrItem.forEach((item) => {
+                    if (typeof item === "object" && item !== null && Object.keys(item).length > 0) {
+                     // First find all special keys and regular keys
+const specialKeys = Object.keys(item).filter(key => 
+  key === "Add" || key === "Either" || key === "Envelope"
+);
+const regularKeys = Object.keys(item).filter(key => 
+  key !== "Add" && key !== "Either" && key !== "Envelope"
+);
+
+// Process each special key separately
+specialKeys.forEach(specialKey => {
+  // Create an object with just this special key and its value
+  const specialItem = {
+    [specialKey]: item[specialKey]
+  };
+  processKeyValuePairs(specialItem, parentKey, [...keyStack]);
+});
+
+// Process remaining regular keys
+if (regularKeys.length > 0) {
+  const regularItem = {};
+  regularKeys.forEach(key => {
+    regularItem[key] = item[key];
+  });
+  
+  if (parentKey == "Either") {
+    temp.push({
+      ...regularItem,
+      previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 2] : null,
+    });
+  } else {
+    temp.push({
+      ...regularItem,
+      previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 3] : null,
+    });
+  }
+}
+                    }
+                  });
+                } else if (typeof subArrayOrItem === "object" && subArrayOrItem !== null) {
+                  const hasSpecialKeys = Object.keys(subArrayOrItem).some(key => 
+                    key === "Add" || key === "Either" || key === "Envelope"
+                  );
+            
+                  if (hasSpecialKeys) {
+                    processKeyValuePairs(subArrayOrItem, parentKey, [...keyStack]);
                   } else {
                     if (parentKey == "Either") {
-                    temp.push({
-                      ...item,
-                      previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 2] : null, // Second-to-last key
-                    });
-                  } else {
-                    temp.push({
-                      ...item,
-                      previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 3] : null, // Second-to-last key
-                    });
+                      temp.push({
+                        ...subArrayOrItem,
+                        previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 2] : null,
+                      });
+                    } else {
+                      temp.push({
+                        ...subArrayOrItem,
+                        previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 3] : null,
+                      });
+                    }
                   }
-                  }
+                } else {
+                  processObject(subArrayOrItem, parentKey, [...keyStack]);
                 }
               });
-            } else if (typeof subArrayOrItem === "object" && subArrayOrItem !== null) {
-              // Handle direct objects in the array
-              const newObj = {};
-              for (const [itemKey, itemValue] of Object.entries(subArrayOrItem)) {
-                newObj[itemKey] = itemValue;
-                if (itemKey === "Add" || itemKey === "Either" || itemKey === "Envelope") {
-                  processKeyValuePairs(subArrayOrItem, parentKey, [...keyStack]); // Recursive call
-                }
+              console.log("lastvalue", lastvalue);
+              secondLastKey = keyStack.length > 1 ? keyStack[keyStack.length - 2] : null;
+            
+              if (parentKey === "Either" || (parentKey === "Add" && firstKey === "Either") && temp.length > 0) {
+                eitherArray.push(temp);
+              } else if (parentKey === "Add" && (!firstKey || firstKey === "Add") && temp.length > 0) {
+                addObj.push(temp);
+              } else if (parentKey === "Envelope" || (parentKey === "Add" && firstKey === "Envelope") && temp.length > 0) {
+                envelopeObj.push(temp);
               }
-              if (parentKey == "Either") {
-                temp.push({
-                  ...subArrayOrItem,
-                  previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 2] : null, // Second-to-last key
-                });
-              } else {
-                temp.push({
-                  ...subArrayOrItem,
-                  previousKey: keyStack.length > 1 ? keyStack[keyStack.length - 3] : null, // Second-to-last key
-                });
-              }
-            } else {
-              processObject(subArrayOrItem, parentKey, [...keyStack]);
+            } else if (typeof value === "object" && value !== null) {
+              processObject(value, key, [...keyStack]);
             }
           });
-    
-          // Update secondLastKey and handle specific cases
           console.log("lastvalue", lastvalue);
           secondLastKey = keyStack.length > 1 ? keyStack[keyStack.length - 2] : null;
     
@@ -827,11 +861,9 @@ function multiplySigns(sign1, sign2) {
             envelopeObj.push(temp);
           }
         } else if (typeof value === "object" && value !== null) {
-          processObject(value, key, [...keyStack]); // Recursive call
+          processObject(value, key, [...keyStack]); 
         }
       }
-    
-      // Clean up the stack to maintain context
       if (parentKey) keyStack.pop();
     }
     
