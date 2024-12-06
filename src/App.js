@@ -1770,10 +1770,6 @@ function join_factor(finalCombinations_sign) {
         }
       });
     };
-    
-    
-
-    // Final common arrays
     const commonArray_add = flattenedAddObj.map(mainArray => {
       // Check if mainArray is valid (not empty and is an array)
       if (Array.isArray(mainArray) && mainArray.length > 0) {
@@ -1869,6 +1865,124 @@ function join(factorCombinations) {
   
       return processArray(inputArray);
   }
+  add = transformArrays(add_specialKeys,add,either);
+  either = transformArrays(either_specialKeys,add,either);
+  envelope = transformArrays(envelope_specialKeys,add,either);
+
+  function transformArrays(inputArray, add_specialKeys, either_specialKeys) {
+    // Deep clone the input array
+    const clonedArray = JSON.parse(JSON.stringify(inputArray));
+  
+    clonedArray.forEach((outerArray) => {
+      if (Array.isArray(outerArray)) {
+        outerArray.forEach((innerArray) => {
+          if (innerArray && typeof innerArray === "object") {
+            // Iterate through key-value pairs of innerArray
+            Object.entries(innerArray).forEach(([key, value]) => {
+              if (key.includes("|specialKeys")) {
+                const specialKeysObject = value;
+  
+                if (specialKeysObject && specialKeysObject.specialKeys) {
+                  const specialArray = specialKeysObject.specialKeys;
+                  const loadcaseNames = [];
+  
+                  // Extract loadCaseName values
+                  specialArray.forEach((outerItem) => {
+                    if (outerItem && typeof outerItem === "object") {
+                      Object.values(outerItem).forEach((nestedArray) => {
+                        if (Array.isArray(nestedArray)) {
+                          nestedArray.forEach((innerArray) => {
+                            if (Array.isArray(innerArray)) {
+                              innerArray.forEach((deepNestedItem) => {
+                                if (
+                                  deepNestedItem &&
+                                  typeof deepNestedItem === "object"
+                                ) {
+                                  if (deepNestedItem.loadCaseName) {
+                                    loadcaseNames.push(
+                                      deepNestedItem.loadCaseName
+                                    );
+                                  } else {
+                                    Object.values(deepNestedItem).forEach(
+                                      (nestedValue) => {
+                                        if (
+                                          nestedValue &&
+                                          typeof nestedValue === "object"
+                                        ) {
+                                          if (nestedValue.loadCaseName) {
+                                            loadcaseNames.push(
+                                              nestedValue.loadCaseName
+                                            );
+                                          }
+                                        }
+                                      }
+                                    );
+                                  }
+                                }
+                              });
+                            }
+                          });
+                        }
+                      });
+                    }
+                  });
+  
+                  // Debugging output for extracted loadcaseNames
+                  console.log("Extracted loadcaseNames:", loadcaseNames);
+  
+                  // Check loadcaseNames in add_specialKeys and either_specialKeys
+                  loadcaseNames.forEach((loadCaseName) => {
+                    let replacementFound = false;
+  
+                    // Check in add_specialKeys
+                    add_specialKeys.forEach((specialKeyArray) => {
+                      specialKeyArray.forEach((specialKeyObject) => {
+                        if (specialKeyObject !== null) {
+                        Object.values(specialKeyObject).forEach((entry) => {
+                          if (entry && entry.loadCaseName === loadCaseName) {
+                            replacementFound = true;
+                            specialKeysObject.specialKeys = [
+                              ...specialKeysObject.specialKeys,
+                              entry,
+                            ];
+                          }
+                        });
+                      }
+                      });
+                    });
+  
+                    // Check in either_specialKeys if not already replaced
+                    if (!replacementFound) {
+                      either_specialKeys.forEach((specialKeyArray) => {
+                        specialKeyArray.forEach((specialKeyObject) => {
+                          if (specialKeyObject !== null) {
+                          Object.values(specialKeyObject).forEach((entry) => {
+                            if (entry && entry.loadCaseName === loadCaseName) {
+                              specialKeysObject.specialKeys = [
+                                ...specialKeysObject.specialKeys,
+                                entry,
+                              ];
+                            }
+                          });
+                        }
+                        });
+                      });
+                    }
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  
+    return clonedArray;
+  }
+  
+  
+   console.log(add);
+   console.log(either);
     const eitherJoin = [];
     const envelopeJoin  = [];
     console.log(either);
