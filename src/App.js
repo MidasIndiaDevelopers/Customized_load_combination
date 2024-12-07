@@ -1899,9 +1899,7 @@ function join(factorCombinations) {
                                   typeof deepNestedItem === "object"
                                 ) {
                                   if (deepNestedItem.loadCaseName) {
-                                    loadcaseNames.push(
-                                      deepNestedItem.loadCaseName
-                                    );
+                                    loadcaseNames.push(deepNestedItem.loadCaseName);
                                   } else {
                                     Object.values(deepNestedItem).forEach(
                                       (nestedValue) => {
@@ -1930,44 +1928,99 @@ function join(factorCombinations) {
                   // Debugging output for extracted loadcaseNames
                   console.log("Extracted loadcaseNames:", loadcaseNames);
   
-                  // Check loadcaseNames in add_specialKeys and either_specialKeys
+                  // Process modifications based on loadCaseNames
                   loadcaseNames.forEach((loadCaseName) => {
-                    let replacementFound = false;
-  
-                    // Check in add_specialKeys
-                    add_specialKeys.forEach((specialKeyArray) => {
-                      specialKeyArray.forEach((specialKeyObject) => {
-                        if (specialKeyObject !== null) {
-                        Object.values(specialKeyObject).forEach((entry) => {
-                          if (entry && entry.loadCaseName === loadCaseName) {
-                            replacementFound = true;
-                            specialKeysObject.specialKeys = [
-                              ...specialKeysObject.specialKeys,
-                              entry,
-                            ];
+                    let replacementArray = null;
+                    add_specialKeys.forEach((specialKeyArray, arrayIndex) => {
+                      if (Array.isArray(specialKeyArray)) {
+                        for (let objectIndex = 0; objectIndex < specialKeyArray.length; objectIndex++) {
+                          const specialKeyObject = specialKeyArray[objectIndex];
+                          if (specialKeyObject && typeof specialKeyObject === "object") {
+                            Object.entries(specialKeyObject).forEach(([key, value]) => {
+                              // Array to store all found loadCaseNames
+                              const allLoadCaseNames = [];
+                    
+                              // Function to recursively collect loadCaseName values
+                              const collectLoadCaseNames = (obj) => {
+                                if (obj && typeof obj === "object") {
+                                  Object.values(obj).forEach((innerValue) => {
+                                    if (innerValue && typeof innerValue === "object") {
+                                      if (innerValue.loadCaseName) {
+                                        allLoadCaseNames.push(innerValue.loadCaseName);
+                                      } else {
+                                        // Recursively process nested objects
+                                        collectLoadCaseNames(innerValue);
+                                      }
+                                    }
+                                  });
+                                }
+                              };
+                    
+                              // Start collecting loadCaseName values from the current value
+                              collectLoadCaseNames(value);
+                    
+                              if (allLoadCaseNames.some((name) => loadcaseNames.includes(name))) {
+                                // Replace the replacementArray with the current specialKeyObject
+                                replacementArray = [specialKeyObject];
+                    
+                                // Remove the object from its initial position
+                                specialKeyArray.splice(objectIndex, 1);
+                                objectIndex--; // Adjust index after splice
+                              }
+                            });
                           }
-                        });
-                      }
-                      });
-                    });
-  
-                    // Check in either_specialKeys if not already replaced
-                    if (!replacementFound) {
-                      either_specialKeys.forEach((specialKeyArray) => {
-                        specialKeyArray.forEach((specialKeyObject) => {
-                          if (specialKeyObject !== null) {
-                          Object.values(specialKeyObject).forEach((entry) => {
-                            if (entry && entry.loadCaseName === loadCaseName) {
-                              specialKeysObject.specialKeys = [
-                                ...specialKeysObject.specialKeys,
-                                entry,
-                              ];
-                            }
-                          });
                         }
-                        });
+                      }
+                    });
+                    
+                    if (!replacementArray) {
+                      either_specialKeys.forEach((specialKeyArray, arrayIndex) => {
+                        if (Array.isArray(specialKeyArray)) {
+                          for (let objectIndex = 0; objectIndex < specialKeyArray.length; objectIndex++) {
+                            const specialKeyObject = specialKeyArray[objectIndex];
+                            if (specialKeyObject && typeof specialKeyObject === "object") {
+                              Object.entries(specialKeyObject).forEach(([key, value]) => {
+                                // Array to store all found loadCaseNames
+                                const allLoadCaseNames = [];
+                    
+                                // Function to recursively collect loadCaseName values
+                                const collectLoadCaseNames = (obj) => {
+                                  if (obj && typeof obj === "object") {
+                                    Object.values(obj).forEach((innerValue) => {
+                                      if (innerValue && typeof innerValue === "object") {
+                                        if (innerValue.loadCaseName) {
+                                          allLoadCaseNames.push(innerValue.loadCaseName);
+                                        } else {
+                                          // Recursively process nested objects
+                                          collectLoadCaseNames(innerValue);
+                                        }
+                                      }
+                                    });
+                                  }
+                                };
+                    
+                                // Start collecting loadCaseName values from the current value
+                                collectLoadCaseNames(value);
+                    
+                                if (allLoadCaseNames.some((name) => loadcaseNames.includes(name))) {
+                                  // Replace the replacementArray with the current specialKeyObject
+                                  replacementArray = [specialKeyObject];
+                    
+                                  // Remove the object from its initial position
+                                  specialKeyArray.splice(objectIndex, 1);
+                                  objectIndex--; // Adjust index after splice
+                                }
+                              });
+                            }
+                          }
+                        }
                       });
                     }
+                    
+                    // Replace the specialKeys array if a match is found
+                    if (replacementArray) {
+                      specialKeysObject.specialKeys = replacementArray;
+                    }               
                   });
                 }
               }
