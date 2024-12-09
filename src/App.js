@@ -782,7 +782,8 @@ function combineAddEither(inputObj) {
                 // Process each special key separately
                 specialKeys.forEach(specialKey => {
                   const specialItem = {
-                    [specialKey]: item[specialKey]
+                    [specialKey]: item[specialKey],
+                    parentKeys: [...keyStack], // Attach parent keys
                   };
   
                   // Process the special item
@@ -799,7 +800,8 @@ function combineAddEither(inputObj) {
                   const combinedItem = {
                     ...regularItem,
                     specialKeys: specialKeys.map(specialKey => ({
-                      [specialKey]: item[specialKey]
+                      [specialKey]: item[specialKey],
+                    parentKeys: [...keyStack], // Attach parent keys
                     }))
                   };
   
@@ -835,6 +837,7 @@ function combineAddEither(inputObj) {
               const specialItem = {};
               specialKeys.forEach(key => {
                 specialItem[key] = subArrayOrItem[key];
+                specialItem.parentKeys = [...keyStack];
               });
   
               const regularItem = {};
@@ -1924,23 +1927,58 @@ function join(factorCombinations) {
                       });
                     }
                   });
-  
-                  // Debugging output for extracted loadcaseNames
                   console.log("Extracted loadcaseNames:", loadcaseNames);
   
-                  // Process modifications based on loadCaseNames
-                  loadcaseNames.forEach((loadCaseName) => {
-                    let replacementArray = null;
-                    add_specialKeys.forEach((specialKeyArray, arrayIndex) => {
+                  let replacementArray = null;
+                  let matchedArrayIndex = -1;
+                  let matchedKeySource = null; // To track whether the match is in add_specialKeys or either_specialKeys
+                  
+                  // Iterate over add_specialKeys
+                  add_specialKeys.forEach((specialKeyArray, arrayIndex) => {
+                    if (Array.isArray(specialKeyArray)) {
+                      for (let objectIndex = 0; objectIndex < specialKeyArray.length; objectIndex++) {
+                        const specialKeyObject = specialKeyArray[objectIndex];
+                        if (specialKeyObject && typeof specialKeyObject === "object") {
+                          Object.entries(specialKeyObject).forEach(([key, value]) => {
+                            const allLoadCaseNames = []; // Array to store all found loadCaseNames
+                  
+                            const collectLoadCaseNames = (obj) => {
+                              if (obj && typeof obj === "object") {
+                                Object.values(obj).forEach((innerValue) => {
+                                  if (innerValue && typeof innerValue === "object") {
+                                    if (innerValue.loadCaseName) {
+                                      allLoadCaseNames.push(innerValue.loadCaseName);
+                                    } else {
+                                      collectLoadCaseNames(innerValue);
+                                    }
+                                  }
+                                });
+                              }
+                            };
+                  
+                            collectLoadCaseNames(value); // Start collecting loadCaseName values
+                  
+                            if (allLoadCaseNames.some((name) => loadcaseNames.includes(name))) {
+                              replacementArray = [specialKeyArray];
+                              matchedArrayIndex = arrayIndex;
+                              matchedKeySource = "add_specialKeys"; // Mark the source
+                            }
+                          });
+                        }
+                      }
+                    }
+                  });
+                  
+                  // If no match found in add_specialKeys, check either_specialKeys
+                  if (!replacementArray) {
+                    either_specialKeys.forEach((specialKeyArray, arrayIndex) => {
                       if (Array.isArray(specialKeyArray)) {
                         for (let objectIndex = 0; objectIndex < specialKeyArray.length; objectIndex++) {
                           const specialKeyObject = specialKeyArray[objectIndex];
                           if (specialKeyObject && typeof specialKeyObject === "object") {
                             Object.entries(specialKeyObject).forEach(([key, value]) => {
-                              // Array to store all found loadCaseNames
-                              const allLoadCaseNames = [];
-                    
-                              // Function to recursively collect loadCaseName values
+                              const allLoadCaseNames = []; // Array to store all found loadCaseNames
+                  
                               const collectLoadCaseNames = (obj) => {
                                 if (obj && typeof obj === "object") {
                                   Object.values(obj).forEach((innerValue) => {
@@ -1948,80 +1986,62 @@ function join(factorCombinations) {
                                       if (innerValue.loadCaseName) {
                                         allLoadCaseNames.push(innerValue.loadCaseName);
                                       } else {
-                                        // Recursively process nested objects
                                         collectLoadCaseNames(innerValue);
                                       }
                                     }
                                   });
                                 }
                               };
-                    
-                              // Start collecting loadCaseName values from the current value
-                              collectLoadCaseNames(value);
-                    
+                  
+                              collectLoadCaseNames(value); // Start collecting loadCaseName values
+                  
                               if (allLoadCaseNames.some((name) => loadcaseNames.includes(name))) {
-                                // Replace the replacementArray with the current specialKeyObject
-                                replacementArray = [specialKeyObject];
-                    
-                                // Remove the object from its initial position
-                                specialKeyArray.splice(objectIndex, 1);
-                                objectIndex--; // Adjust index after splice
+                                replacementArray = [specialKeyArray];
+                                matchedArrayIndex = arrayIndex;
+                                matchedKeySource = "either_specialKeys"; // Mark the source
                               }
                             });
                           }
                         }
                       }
                     });
+                  }
+                  
+                  // Replace the specialKeys array if a match is found
+                  if (replacementArray) {
+                    if (specialKeysObject && specialKeysObject.hasOwnProperty('specialKeys')) {
+                      // Iterate over the key-value pairs in the specialKeys object
+                      Object.entries(specialKeysObject.specialKeys).forEach(([key, value]) => {
+                        
+                        // If the key is one of the specified strings, replace its value
+                        if (key === "Add" || key === "Either" || key === "Envelope") {
+                          specialKeysObject.specialKeys[key] = replacementArray;  // Replace the value for the specific key
+                        }
                     
-                    if (!replacementArray) {
-                      either_specialKeys.forEach((specialKeyArray, arrayIndex) => {
-                        if (Array.isArray(specialKeyArray)) {
-                          for (let objectIndex = 0; objectIndex < specialKeyArray.length; objectIndex++) {
-                            const specialKeyObject = specialKeyArray[objectIndex];
-                            if (specialKeyObject && typeof specialKeyObject === "object") {
-                              Object.entries(specialKeyObject).forEach(([key, value]) => {
-                                // Array to store all found loadCaseNames
-                                const allLoadCaseNames = [];
-                    
-                                // Function to recursively collect loadCaseName values
-                                const collectLoadCaseNames = (obj) => {
-                                  if (obj && typeof obj === "object") {
-                                    Object.values(obj).forEach((innerValue) => {
-                                      if (innerValue && typeof innerValue === "object") {
-                                        if (innerValue.loadCaseName) {
-                                          allLoadCaseNames.push(innerValue.loadCaseName);
-                                        } else {
-                                          // Recursively process nested objects
-                                          collectLoadCaseNames(innerValue);
-                                        }
-                                      }
-                                    });
-                                  }
-                                };
-                    
-                                // Start collecting loadCaseName values from the current value
-                                collectLoadCaseNames(value);
-                    
-                                if (allLoadCaseNames.some((name) => loadcaseNames.includes(name))) {
-                                  // Replace the replacementArray with the current specialKeyObject
-                                  replacementArray = [specialKeyObject];
-                    
-                                  // Remove the object from its initial position
-                                  specialKeyArray.splice(objectIndex, 1);
-                                  objectIndex--; // Adjust index after splice
-                                }
-                              });
-                            }
+                        // If the key is a number, inspect its value
+                        else if (!isNaN(key)) {
+                          // If the value is an object, check for key:value pairs within it
+                          if (typeof value === "object" && value !== null) {
+                            Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+                              // Check for your specific conditions within the nested key-value pair
+                              if (nestedKey === "Add" || nestedKey === "Either") {
+                                // Replace nested value or take any other action as needed
+                                value[nestedKey] = replacementArray;
+                              }
+                            });
                           }
                         }
                       });
+                    }                    
+                  
+                    // Make the matched specialKeyArray null in its original position
+                    if (matchedKeySource === "add_specialKeys") {
+                      add_specialKeys[matchedArrayIndex] = null;
+                    } else if (matchedKeySource === "either_specialKeys") {
+                      either_specialKeys[matchedArrayIndex] = null;
                     }
-                    
-                    // Replace the specialKeys array if a match is found
-                    if (replacementArray) {
-                      specialKeysObject.specialKeys = replacementArray;
-                    }               
-                  });
+                  }
+                  
                 }
               }
             });
@@ -2032,7 +2052,6 @@ function join(factorCombinations) {
   
     return clonedArray;
   }
-  
   
    console.log(add);
    console.log(either);
@@ -2060,29 +2079,107 @@ function join(factorCombinations) {
     }
     function extractFactorsFromObject(factorObj, factorIndex, i) {
       const extractedFactors = [];
+    
       for (const key in factorObj) {
-        if (factorObj.hasOwnProperty(key)) {
-          const { loadCaseName, sign, factor } = factorObj[key];
-          const factorValue = getSingleFactor(factor, factorIndex, i); 
-          if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
-            extractedFactors.push({ loadCaseName, sign, factor: factorValue });
-          }
-        }
+  if (factorObj.hasOwnProperty(key)) {
+    if (!isNaN(key)) {
+      // Handle numeric keys
+      const value = factorObj[key];
+      if (value && typeof value === "object") {
+        // Process the value recursively or handle it as needed
+        extractedFactors.push(...extractFactorsFromObject(value, factorIndex, i));
       }
+    } 
+    else if (key.includes("specialKeys")) {  // General check for any specialKeys
+      const { specialKeys } = factorObj[key] || {};
+      if (specialKeys && Array.isArray(specialKeys)) {
+        Object.entries(specialKeys).forEach(([key, value]) => {
+          // Check if the key is 'Add' and if the value is an array
+          if (key === "Add" && Array.isArray(value)) {
+            // Process each item in the 'Add' array
+            value.forEach(item => {
+              extractedFactors.push(extractFactorsFromObject(item, factorIndex, i));
+            });
+          }
+          
+          // Check if the key is a number (like 0, 1, 2, etc.)
+          else if (!isNaN(key)) {
+            Object.entries(value).forEach(([innerKey, innerValue]) => {
+              // Check if the innerKey is 'Add'
+              if (innerKey === "Add" && Array.isArray(innerValue)) {
+                // Process each item in the 'Add' array
+                innerValue.forEach(item => {
+                  // If the item itself is an array, process each array element
+                  if (Array.isArray(item)) {
+                    // If the item is an array, process each element of the array
+                    item.forEach(subItem => {
+                      // Call extractFactorsFromObject for each subItem (element of the array)
+                      extractedFactors.push(extractFactorsFromObject(subItem, factorIndex, i));
+                    });
+                  }
+                  // If the item itself is an object, process it
+                  else if (item && typeof item === "object") {
+                    // Call extractFactorsFromObject for the item
+                    extractedFactors.push(extractFactorsFromObject(item, factorIndex, i));
+                  }
+                  // If the item is neither an array nor an object, handle it as needed (optional)
+                  else {
+                    // extractedFactors.push(item); // Optionally handle non-object items
+                  }
+                });
+              }
+            });
+            
+          }
+        
+          // Optionally, add additional conditions for other keys like 'Either' or others
+        });
+        
+        
+        
+        // Check if any object inside specialKeys contains 'Either' as a key
+        specialKeys.forEach(innerObj => {
+          if (innerObj && typeof innerObj === "object") {
+            // Check for the presence of 'Either' as a key
+            if ('Either' in innerObj) {
+              const flattenedInnerObj = Array.isArray(innerObj) ? innerObj.flat(1) : [innerObj];
+              extractedFactors.push(...extractFactorsFromObject(flattenedInnerObj, factorIndex, i));
+            }
+          }
+        });
+      }
+    }
+    else {
+      // Process normal keys
+      const { loadCaseName, sign, factor } = factorObj[key];
+      let factorValue;
+      if (factor !== undefined) {
+        factorValue = getSingleFactor(factor, factorIndex, i);
+      }
+      if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
+        extractedFactors.push({ loadCaseName, sign, factor: factorValue });
+      }
+    }
+  }
+}
+
+    
       if (!extractedFactorsStore[factorIndex]) {
         extractedFactorsStore[factorIndex] = [];
       }
       extractedFactorsStore[factorIndex][i] = extractedFactors;
       return extractedFactors;
     }
+    
     function combineMatchingFactors(either, factorIndex, i,either_specialKeys) {
       console.log(either_specialKeys);
       console.log(either);
-      const combinedResult = [];
+      let combinedResult = [];
+    
       const extractedFactors = either.flatMap(arr => {
         if (Array.isArray(arr) && arr.length > 1) {
-            return arr.flatMap(subArray => {
-              const flattenedArr = Array.isArray(subArray) ? subArray.flat() : [subArray];
+          return arr.flatMap(subArray => {
+            const flattenedArr = Array.isArray(subArray) ? subArray.flat() : [subArray];
               return flattenedArr.flatMap(factorObj => {
                 if (Array.isArray(factorObj)) {
                   return factorObj.map(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
@@ -2090,7 +2187,7 @@ function join(factorCombinations) {
                   return [extractFactorsFromObject(factorObj, factorIndex, i)];
                 }
               });
-            });
+          });
         } else {
           const flattenedArr = Array.isArray(arr) ? arr.flat() : [arr];
           return flattenedArr.flatMap(factorObj => {
@@ -2102,6 +2199,7 @@ function join(factorCombinations) {
           });
         }
       });
+    
       if (!extractedFactorsStore[factorIndex]) {
         extractedFactorsStore[factorIndex] = [];
       }
@@ -2118,9 +2216,33 @@ function join(factorCombinations) {
           temp.pop();
         }
       }
+    
       generateCombinations(extractedFactors);
+      if (Array.isArray(combinedResult)) {
+        combinedResult = combinedResult.map(innerArray => {
+          if (Array.isArray(innerArray)) {
+            // Flatten any subarray within innerArray
+            const flattenedArray = [];
+            innerArray.forEach(item => {
+              if (Array.isArray(item)) {
+                // If the item is an array, add its elements to the flattened array
+                flattenedArray.push(...item);
+              } else {
+                // If the item is not an array, add it as is
+                flattenedArray.push(item);
+              }
+            });
+            return flattenedArray; // Return the completely flattened inner array
+          }
+          return innerArray; // If not an array, return as is
+        });
+      }
+      
       return combinedResult;
+      
     }
+    
+    
     function getMaxIValue(either) {
       let maxIValue = 5;  
     
@@ -2269,8 +2391,10 @@ function join(factorCombinations) {
                         const loadCaseName = nestedValue.loadCaseName;
                         const sign = nestedValue.sign;
                         const factor = nestedValue.factor;
-                        const factorValue = getSingleFactor(factor, factorIndex, i);
-          
+                        let factorValue;
+                        if (factor !== undefined) {
+                        factorValue = getSingleFactor(factor, factorIndex, i);
+                        }
                         if (factorValue !== undefined && factorValue !== null) {
                           combinedResult.push({ loadCaseName, sign, factor: factorValue });
                         }
@@ -2281,8 +2405,10 @@ function join(factorCombinations) {
                       const loadCaseName = value.loadCaseName;
                       const sign = value.sign;
                       const factor = value.factor;
-                      const factorValue = getSingleFactor(factor, factorIndex, i);
-          
+                      let factorValue;
+                      if (factor !== undefined) {
+                        factorValue = getSingleFactor(factor, factorIndex, i);
+                      }
                       if (factorValue !== undefined && factorValue !== null) {
                         combinedResult.push({ loadCaseName, sign, factor: factorValue });
                       }
@@ -2442,10 +2568,11 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
                 const loadCaseName = nestedValue.loadCaseName;
                 const sign = nestedValue.sign;
                 const factor = nestedValue.factor;
-    
+                let factorValue;
                 // Get the factor value using the function
-                const factorValue = getSingleFactor(factor, factorIndex, i);
-    
+                if (factor !== undefined) {
+                factorValue = getSingleFactor(factor, factorIndex, i);
+              }
                 // Check if the factorValue is valid
                 if (factorValue !== undefined && factorValue !== null) {
                   addmultiResult.push({ loadCaseName, sign, factor: factorValue });
@@ -2457,10 +2584,11 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
               const loadCaseName = value.loadCaseName;
               const sign = value.sign;
               const factor = value.factor;
-    
+              let factorValue;
+              if (factor !== undefined) {
               // Get the factor value using the function
-              const factorValue = getSingleFactor(factor, factorIndex, i);
-    
+              factorValue = getSingleFactor(factor, factorIndex, i);
+              }
               // Check if the factorValue is valid
               if (factorValue !== undefined && factorValue !== null) {
                 addmultiResult.push({ loadCaseName, sign, factor: factorValue });
