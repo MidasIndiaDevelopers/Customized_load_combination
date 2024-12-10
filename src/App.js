@@ -2129,10 +2129,7 @@ function join(factorCombinations) {
                 });
               }
             });
-            
           }
-        
-          // Optionally, add additional conditions for other keys like 'Either' or others
         });
         
         
@@ -2162,8 +2159,6 @@ function join(factorCombinations) {
     }
   }
 }
-
-    
       if (!extractedFactorsStore[factorIndex]) {
         extractedFactorsStore[factorIndex] = [];
       }
@@ -2234,7 +2229,7 @@ function join(factorCombinations) {
             });
             return flattenedArray; // Return the completely flattened inner array
           }
-          return innerArray; // If not an array, return as is
+          return innerArray; 
         });
       }
       
@@ -2278,7 +2273,6 @@ function join(factorCombinations) {
     function combineLoadCases(either, add, envelope) {
       const allCombinations = [];
       const addmulti = [];
-      // Step 1: Loop through each factor and i
       const factorLimit = either.length;
       const maxI = getMaxIValue(either, add);
       console.log(maxI);
@@ -2291,16 +2285,16 @@ function join(factorCombinations) {
             let modifiedArray = [];
             let nonModifiedArray = [];
         
-            // Manipulate the `either` object before processing
+            // Manipulate the either object before processing
             const modifiedEither = either.map(eitherArray => {
                 if (Array.isArray(eitherArray) && eitherArray.length > 0) {
-                    // Check if all inner objects have the same `previousKey`
+                    // Check if all inner objects have the same previousKey
                     const allHaveSamePreviousKey = eitherArray.every(obj => {
                         const previousKeys = Object.values(obj).map(innerObj => innerObj?.previousKey);
                         return previousKeys.every(key => key === previousKeys[0]);
                     });
         
-                    // If `previousKey` is "Either", break into separate arrays
+                    // If previousKey is "Either", break into separate arrays
                     if (allHaveSamePreviousKey && Object.values(eitherArray[0])[0]?.previousKey === "Either") {
                         const separatedArrays = eitherArray.map(obj => [obj]); // Break into separate arrays
                         modifiedArray.push(...separatedArrays); // Push separated arrays to modifiedArray
@@ -2335,7 +2329,7 @@ function join(factorCombinations) {
             let nonModifiedArray = [];
             const modifiedEither = either.map(eitherArray => {
                 if (Array.isArray(eitherArray) && eitherArray.length > 1) {
-                    // Check if all inner objects have the same `previousKey`
+                    // Check if all inner objects have the same previousKey
                     const allHaveSamePreviousKey = eitherArray.every(obj => {
                         const previousKeys = Object.values(obj).map(innerObj => innerObj?.previousKey);
                         return previousKeys.every(key => key === previousKeys[0]);
@@ -2487,7 +2481,7 @@ for (let j = 0; j < 5; j++) {
     // Initialize elementsToPermute with rest of elements in the current i-th array
     let elementsToPermute = [baseInnerArray.slice(1)];
     let elementsToPermute_first = [baseInnerArray.slice(1)];
-    // Additional loop for other `i` values (0 to 4), except the current `i`
+    // Additional loop for other i values (0 to 4), except the current i
     for (let k = 0; k < 5; k++) {
       if (k === i) continue; // Skip the current i index to avoid repetition
       const additionalArray = extractedValues[k][j];
@@ -2525,7 +2519,7 @@ console.log(mergeArray);
             tempResult.pop();  // Backtrack: remove the last item before the next iteration
           }
         } else {
-          console.error(`Expected an array at index ${index} but found:`, arrays[index]);
+          // console.error(Expected an array at index ${index} but found:, arrays[index]);
         }
       
         return finalCombinations;  // Return all combinations generated
@@ -2635,13 +2629,26 @@ combinedResult.forEach((mainArray) => {
 });
 console.log(allCombinations_multi);
 const flattenedCombinations = allCombinations_multi.flat(1);
+function flattenArray(arr) {
+  return arr.reduce((acc, item) => {
+      if (Array.isArray(item)) {
+          // Recursively flatten if the item is an array
+          acc.push(...flattenArray(item));
+      } else {
+          acc.push(item);
+      }
+      return acc;
+  }, []);
+}
 
-const joinedCombinations = [...flattenedCombinations, ...allCombinations];
+// Process flattenedCombinations to ensure no subarrays are present
+const fullyFlattenedCombinations = flattenedCombinations.map(array => flattenArray(array));
 
-// Log the joined array
+// Combine the fully flattened combinations with allCombinations
+const joinedCombinations = [...fullyFlattenedCombinations, ...allCombinations];
+
 console.log(joinedCombinations);
-
-  return joinedCombinations;
+return joinedCombinations;
 }
     if (either && either.length > 0 || envelope &&  envelope.length > 0) {
   // Combine either and envelope into a single array
@@ -2858,8 +2865,13 @@ function permutation_sign(result11) {
           if (new_temp.length > 0) {
             for (const newItem of new_temp) {
               if (positiveArray.length > 0 && negativeArray.length > 0) {
+                if (typeof newItem !== "object") {
                 temp.push([...positiveArray, ...newItem]);
                 temp.push([...negativeArray, ...newItem]);
+                } else {
+                  temp.push([...positiveArray]);
+                  temp.push([...negativeArray]);
+                }
               } else {
                 temp.push(newItem);
               }
@@ -2938,7 +2950,9 @@ function permutation_sign(result11) {
             for (const combination of combinations) {
               if (new_temp.length > 0) {
                 for (const newItem of new_temp) {
-                  temp.push([...combination, ...newItem]);
+                  if (typeof newItem !== 'object' || Array.isArray(newItem)) {
+                    temp.push([...combination, ...newItem]);
+                  }
                 }
               } else {
                 temp.push(combination);
@@ -3178,7 +3192,7 @@ const handleImportClick = () => {
     setImportLoading(false); // Reset loading state
   }, 5000); // Replace this with your actual import logic
 };
-const [loadCombinations, setLoadCombinations] = useState(
+let [loadCombinations, setLoadCombinations] = useState(
   [
     { loadCombination: '', active: '', type: '', loadCases: [{
               loadCaseName: '',
