@@ -42,6 +42,7 @@ const [exportLoading, setExportLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
 const { enqueueSnackbar } = useSnackbar();
+
   const toggleLoadCaseDropdown = (index) => {
     setLoadCaseDropdownIndex(loadCaseDropdownIndex === index ? -1 : index);
   };
@@ -1656,29 +1657,47 @@ function join_factor(finalCombinations_sign) {
             }
           } else {
             mainArray.forEach(currentArray => {
-              // Check if the currentArray has any elements before proceeding
               if (currentArray.length > 0) {
-                const length = currentArray[0].length;
-                for (let i = 0; i < length; i++) {
-                  let combinedArray = [];
-                  currentArray.forEach(subArray => {
-                    if (Array.isArray(subArray) && subArray[i]) {
-                      combinedArray.push(subArray[i]);
-                    }
+                  // Initialize a separate group for the currentArray
+                  let currentArrayGroup = [];
+          
+                  // Check if `currentArray` contains subarrays at any level
+                  const containsNestedSubArray = currentArray.some(item => {
+                      if (Array.isArray(item)) {
+                          // Check deeply within `item` for subarrays
+                          return item.some(subItem => Array.isArray(subItem));
+                      }
+                      return false;
                   });
-                  mainArrayGroup.push([...deepFlatten(combinedArray)]);
-                  combinedArray = [];
-                }
+          
+                  if (!containsNestedSubArray) {
+                      // If no subarrays exist, push the flattened currentArray directly into currentArrayGroup
+                      currentArrayGroup.push([...deepFlatten(currentArray)]);
+                  } else {
+                      // Process each subarray individually
+                      const length = currentArray[0].length;
+                      for (let i = 0; i < length; i++) {
+                          let combinedArray = [];
+                          currentArray.forEach(subArray => {
+                              if (Array.isArray(subArray) && subArray[i]) {
+                                  combinedArray.push(subArray[i]);
+                              }
+                          });
+                          currentArrayGroup.push([...deepFlatten(combinedArray)]);
+                      }
+                  }
+          
+                  // Add the currentArrayGroup to the mainArrayGroup
+                  mainArrayGroup.push(currentArrayGroup);
               }
-            });
-          }
+          });
           
           // Push the processed mainArrayGroup into flattenedAddObj
-          flattenedAddObj.push(mainArrayGroup);
+          flattenedAddObj.push(mainArrayGroup);          
+          }
         }
       });
-    }
-    
+  }
     // Flatten envelopeObj
     if (Array.isArray(envelopeObj)) {
       envelopeObj.forEach(arr => {
@@ -1776,14 +1795,30 @@ function join_factor(finalCombinations_sign) {
     const commonArray_add = flattenedAddObj.map(mainArray => {
       // Check if mainArray is valid (not empty and is an array)
       if (Array.isArray(mainArray) && mainArray.length > 0) {
-        // Process each subarray in the mainArray
-        return mainArray.map(subArray => {
-          // Check if subArray is valid before applying combineFactors
-          return Array.isArray(subArray) ? [combineFactors(subArray)] : subArray;
-        });
-      } else {
+        if (mainArray.length > 1) {
+          // If mainArray has more than one subarray, process each inner array
+          return mainArray.map(subArray => {
+            // Check if subArray is valid and contains inner arrays
+            if (Array.isArray(subArray)) {
+              return subArray.map(innerArray => {
+                // Check if innerArray is valid before applying combineFactors
+                return Array.isArray(innerArray) ? combineFactors(innerArray) : innerArray;
+              });
+            }
+            return subArray; // If not an array, return as is
+          });
+        } else {
+          // If mainArray.length <= 1, process subArray directly
+          return mainArray.map(subArray => {
+            // Check if subArray is valid before applying combineFactors
+            return Array.isArray(subArray) ? [combineFactors(subArray)] : subArray;
+          });
+        }
       }
+      // Return an empty array if mainArray is not valid
+      return [];
     });
+    
     const commonArray_Either = flattenedEitherArray.map(item => {
       if (Array.isArray(item)) {
         return item.map(subArray => combineFactors(Array.isArray(subArray) ? subArray : [subArray]));
@@ -2159,18 +2194,89 @@ function join(factorCombinations) {
     }
   }
 }
-      if (!extractedFactorsStore[factorIndex]) {
-        extractedFactorsStore[factorIndex] = [];
-      }
-      extractedFactorsStore[factorIndex][i] = extractedFactors;
+if (!extractedFactorsStore[factorIndex]) {
+  extractedFactorsStore[factorIndex] = [];
+}
+extractedFactorsStore[factorIndex][i] = extractedFactors;
       return extractedFactors;
     }
     
-    function combineMatchingFactors(either, factorIndex, i,either_specialKeys) {
+    function combineMatchingFactors(either, factorIndex, i, either_specialKeys,check) {
       console.log(either_specialKeys);
       console.log(either);
       let combinedResult = [];
-    
+     if(check) {
+      // Store extracted factors for each `arr` in `either` separately
+      const separateExtractedFactors = [];
+  
+      // Process each array in `either` individually
+      either.forEach((arr, arrIndex) => {
+          if (Array.isArray(arr)) {
+              const extractedFactors = arr.flatMap(subArray => {
+                  const flattenedArr = Array.isArray(subArray) ? subArray.flat() : [subArray];
+                  return flattenedArr.flatMap(factorObj => {
+                      if (Array.isArray(factorObj)) {
+                          return factorObj.map(innerObj => extractFactorsFromObject(innerObj, factorIndex, i));
+                      } else {
+                          return [extractFactorsFromObject(factorObj, factorIndex, i)];
+                      }
+                  });
+              });
+  
+              // Store extracted factors for this array in a separate structure
+              separateExtractedFactors.push(extractedFactors);
+  
+              // Optionally, store in `extractedFactorsStore` if needed globally
+            
+          } else {
+              console.warn(`Non-array element encountered in either at index ${arrIndex}, skipping:`, arr);
+          }
+      });
+      if (!extractedFactorsStore[factorIndex]) {
+        extractedFactorsStore[factorIndex] = [];
+    }
+    extractedFactorsStore[factorIndex][i] = separateExtractedFactors;
+  
+      // Generate combinations separately for each set of extracted factors
+      separateExtractedFactors.forEach((factorsGroup, groupIndex) => {
+          const groupCombinedResult = [];
+          
+          function generateCombinations(arrays, temp = [], index = 0) {
+              if (index === arrays.length) {
+                  groupCombinedResult.push([...temp]);
+                  return;
+              }
+              for (const item of arrays[index]) {
+                  temp.push(item);
+                  generateCombinations(arrays, temp, index + 1);
+                  temp.pop();
+              }
+          }
+  
+          generateCombinations(factorsGroup);
+  
+          // Flatten and store the result for this group
+          if (Array.isArray(groupCombinedResult)) {
+              combinedResult.push({
+                  groupIndex,
+                  combinations: groupCombinedResult.map(innerArray => {
+                      if (Array.isArray(innerArray)) {
+                          const flattenedArray = [];
+                          innerArray.forEach(item => {
+                              if (Array.isArray(item)) {
+                                  flattenedArray.push(...item);
+                              } else {
+                                  flattenedArray.push(item);
+                              }
+                          });
+                          return flattenedArray;
+                      }
+                      return innerArray;
+                  }),
+              });
+          }
+      });
+     } else {
       const extractedFactors = either.flatMap(arr => {
         if (Array.isArray(arr) && arr.length > 1) {
           return arr.flatMap(subArray => {
@@ -2229,15 +2335,14 @@ function join(factorCombinations) {
             });
             return flattenedArray; // Return the completely flattened inner array
           }
-          return innerArray; 
+          return innerArray; // If not an array, return as is
         });
       }
-      
+     }
       return combinedResult;
-      
-    }
-    
-    
+  }
+  
+   
     function getMaxIValue(either) {
       let maxIValue = 5;  
     
@@ -2279,6 +2384,7 @@ function join(factorCombinations) {
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
         console.log(factorIndex);
         for (let i = 0; i < maxI; i++) {
+          let check;
           let factorCombinations = [];
           if (firstKey === "Either" || firstKey === "Envelope") {
             // Prepare separate arrays
@@ -2317,10 +2423,8 @@ function join(factorCombinations) {
                     });
                 });
             }
-            combinedArrays.forEach(eitherArray => {
-                let result = combineMatchingFactors(eitherArray, factorIndex, i,either_specialKeys,add,add_specialKeys);
-                factorCombinations.push(...result);
-            });
+            let result = combineMatchingFactors(combinedArrays, factorIndex, i, either_specialKeys);
+            factorCombinations.push(...result);
         
             console.log(factorCombinations);
         } else if (firstKey === "Add") {
@@ -2356,69 +2460,81 @@ function join(factorCombinations) {
                     });
                 });
             }
-            combinedArrays.forEach(eitherArray => {
-                let result = combineMatchingFactors(eitherArray, factorIndex, i,either_specialKeys,add, add_specialKeys);
-                factorCombinations.push(...result);
-            });
+            let result = combineMatchingFactors(combinedArrays, factorIndex, i, either_specialKeys,check=true);
+            factorCombinations.push(...result);
             if (combinedArrays.length === 0) {
-              factorCombinations = combineMatchingFactors(either,factorIndex,i,either_specialKeys,add,add_specialKeys);
+              factorCombinations = combineMatchingFactors(either,factorIndex,i,either_specialKeys,check=false);
             }
             console.log(factorCombinations);
         }
-          // Step 2: Iterate through the 'add' arrays
-          add.forEach(addArray => {
-            if (Array.isArray(addArray) && addArray.length > 0) {
-              factorCombinations.forEach(factorCombination => {
-                const addresult = [];
-                
-                addArray.forEach(item => {
-                  Object.keys(item).forEach(key => {
-                    // Declare combinedResult inside this loop for each iteration
+        add.forEach(addArray => {
+          if (Array.isArray(addArray) && addArray.length > 0) {
+            const addresult = [];
+            addArray.forEach(subArray => {
+              if (Array.isArray(subArray)) {
+                // Flatten the subArray once before processing it
+                const flatSubArray = subArray.flat();
+        
+                // Process the flattened array
+                flatSubArray.forEach(item => {
+                  factorCombinations.forEach(factorCombination => {
                     let combinedResult = [];
-                    
-                    // Check if the key is a number
-                    if (!isNaN(parseInt(key, 10))) {
-                      // If the key is a number, go deeper into its nested structure
-                      const nestedObj = item[key];
-                      Object.keys(nestedObj).forEach(nestedKey => {
-                        const nestedValue = nestedObj[nestedKey];
-                        const loadCaseName = nestedValue.loadCaseName;
-                        const sign = nestedValue.sign;
-                        const factor = nestedValue.factor;
+                    Object.keys(item).forEach(key => {
+                      if (!isNaN(parseInt(key, 10))) {
+                        // If the key is a number, go deeper into its nested structure
+                        const nestedObj = item[key];
+                        Object.keys(nestedObj).forEach(nestedKey => {
+                          const nestedValue = nestedObj[nestedKey];
+                          const loadCaseName = nestedValue.loadCaseName;
+                          const sign = nestedValue.sign;
+                          const factor = nestedValue.factor;
+                          let factorValue;
+                          if (factor !== undefined) {
+                            factorValue = getSingleFactor(factor, factorIndex, i);
+                          }
+                          if (factorValue !== undefined && factorValue !== null) {
+                            combinedResult.push({ loadCaseName, sign, factor: factorValue });
+                          }
+                        });
+                      } else {
+                        // Follow the current process for non-numeric keys
+                        const value = item[key];
+                        const loadCaseName = value.loadCaseName;
+                        const sign = value.sign;
+                        const factor = value.factor;
                         let factorValue;
                         if (factor !== undefined) {
-                        factorValue = getSingleFactor(factor, factorIndex, i);
+                          factorValue = getSingleFactor(factor, factorIndex, i);
                         }
                         if (factorValue !== undefined && factorValue !== null) {
                           combinedResult.push({ loadCaseName, sign, factor: factorValue });
                         }
-                      });
-                    } else {
-                      // Follow the current process for non-numeric keys
-                      const value = item[key];
-                      const loadCaseName = value.loadCaseName;
-                      const sign = value.sign;
-                      const factor = value.factor;
-                      let factorValue;
-                      if (factor !== undefined) {
-                        factorValue = getSingleFactor(factor, factorIndex, i);
                       }
-                      if (factorValue !== undefined && factorValue !== null) {
-                        combinedResult.push({ loadCaseName, sign, factor: factorValue });
-                      }
-                    }
-          
+                    });
+        
                     // If combinedResult has data, push it along with factorCombination into allCombinations
                     if (combinedResult.length > 0) {
-                      combinedResult.push(...factorCombination);
-                      allCombinations.push(combinedResult);
+                      if (factorCombination.combinations) {
+                        // Extract arrays from `factorCombination.combinations`
+                        const extractedCombinations = factorCombination.combinations;
+                        extractedCombinations.forEach(innerArray => {
+                          // Temporarily hold the combined result for the current innerArray
+                          const tempCombinedResult = [...combinedResult, ...innerArray];
+                          allCombinations.push(tempCombinedResult); // Push a copy to avoid mutation
+                        });
+                      } else {
+                        // If factorCombination.combinations doesn't exist, push factorCombination directly
+                        combinedResult.push(...factorCombination);
+                        allCombinations.push(combinedResult);
+                      }
                     }
                   });
                 });
-              });
-            }
-          });
-          
+              }
+            });
+          }
+        });
+        
           const nonEmptyFactorCombinations = factorCombinations.filter(factor => factor.length > 0);
           if (add.length === 0 && nonEmptyFactorCombinations.length > 0) {
             allCombinations.push(...factorCombinations);
