@@ -49,7 +49,7 @@ const { enqueueSnackbar } = useSnackbar();
   const toggleSignDropdown = (index) => {
     setSignDropdownIndex(signDropdownIndex === index ? null : index);
   };
-  
+    
   const handleLoadCaseOptionSelect = (loadCombinationIndex, loadCaseIndex, selectedLoadCase) => {
     const updatedLoadCombinations = [...loadCombinations];
     updatedLoadCombinations[loadCombinationIndex].loadCases[loadCaseIndex].loadCaseName = selectedLoadCase;
@@ -415,12 +415,12 @@ function createNDimensionalArray(dimensions, fillValue = undefined) {
   return new Array(5).fill(undefined).map(() => createNDimensionalArray(dimensions - 1, fillValue));
 }
 
-function createCombinations(loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 1, factorIndexArray = []) {
+function createCombinations(type,loadCases, strengthCombination, combinations, loadNames, result, value, factor, sign, dimension = 1, factorIndexArray = []) {
   // Initialize factorArray with dynamic dimensions
   let factorArray = createNDimensionalArray(dimension);
   const cleanedLoadCaseName = loadCases.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
-  if (loadNames.includes(cleanedLoadCaseName)) {
-    // If loadCaseName exists in loadNames
+  if (loadNames.includes(cleanedLoadCaseName) || 
+  (type === "Envelope" && getLoadCaseFactors(loadCases.loadCaseName, combinations)?.type === "Add")) {
     for (let i = 1; i <= 5; i++) {
       const factorKey = `factor${i}`;
       let multipliedFactor = loadCases[factorKey] * value;
@@ -524,6 +524,7 @@ else if (dimension > 2) {
               }
             } else {
               createCombinations(
+                type,
                 eitherLoadCase,
                 strengthCombination,
                 combinations,
@@ -550,7 +551,8 @@ else if (dimension > 2) {
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, addLoadCase.sign || '+');
             const addLoadCaseName = addLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
-            if (loadNames.includes(addLoadCaseName)) {
+            if (loadNames.includes(addLoadCaseName) || 
+            (type === "Envelope" && getLoadCaseFactors(addLoadCase.loadCaseName, combinations)?.type === "Add")) {
               if (factorIndex === 1) {
                 factorArray = createNDimensionalArray(dimension);
                 for (let i = 1; i <= 5; i++) {
@@ -594,6 +596,7 @@ else if (dimension > 2) {
               }
             } else {
               createCombinations(
+                type,
                 addLoadCase,
                 strengthCombination,
                 combinations,
@@ -650,6 +653,7 @@ else if (dimension > 2) {
               }
             } else {
               createCombinations(
+                type,
                 envelopeLoadCase,
                 strengthCombination,
                 combinations,
@@ -1111,7 +1115,7 @@ async function generateBasicCombinations(loadCombinations) {
         const factorObject = factors.find(f => f.factor === factor);
         // Check if the factor value is defined
         if (factorObject && factorObject.value !== undefined  && factorObject.value !== "") {
-          const new_11 = createCombinations(loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor, sign);
+          const new_11 = createCombinations(type,loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor, sign);
           console.log(new_11);
           // Combine and permute the results
           const result11 = combineAddEither([new_11]);
@@ -1195,7 +1199,7 @@ console.log(joinedCombinations);
       last_value = idx + 1 + combinationCounter;
       });
   }
-    if (type === "Either") {
+    if (type === "Either" || type === "Envelope") {
       const concatenatedArray = joinedCombinations.flat();
       console.log(concatenatedArray);
       concatenatedArray.forEach((combArray) => {
@@ -1336,7 +1340,6 @@ if (values["Generate inactive load combinations in midas"]) {
             const factorObject = factors.find(f => f.factor === factor);
 
             if (factorObject && factorObject.value !== undefined && factorObject.value !== "" && factorObject.value !== null && factorObject.value != 0) {
-              // Call createCombinations for the current factor
               const newCombination = createCombinations(
                 loadCase,
                 inactiveCombination,
@@ -1693,8 +1696,9 @@ function join_factor(finalCombinations_sign) {
           });
           
           // Push the processed mainArrayGroup into flattenedAddObj
-          flattenedAddObj.push(mainArrayGroup);          
+                    
           }
+          flattenedAddObj.push(mainArrayGroup);
         }
       });
   }
@@ -1796,18 +1800,23 @@ function join_factor(finalCombinations_sign) {
       // Check if mainArray is valid (not empty and is an array)
       if (Array.isArray(mainArray) && mainArray.length > 0) {
         if (mainArray.length > 1) {
-          // If mainArray has more than one subarray, process each inner array
-          return mainArray.map(subArray => {
-            // Check if subArray is valid and contains inner arrays
-            if (Array.isArray(subArray)) {
-              return subArray.map(innerArray => {
-                // Check if innerArray is valid before applying combineFactors
-                return Array.isArray(innerArray) ? combineFactors(innerArray) : innerArray;
-              });
-            }
-            return subArray; // If not an array, return as is
-          });
-        } else {
+            // If mainArray has more than one subarray, process each inner array
+            return mainArray.map(subArray => {
+                // Check if subArray is valid
+                if (Array.isArray(subArray)) {
+                    // If subArray doesn't contain nested arrays, send directly to combineFactors
+                    if (!subArray.some(item => Array.isArray(item))) {
+                        return combineFactors(subArray);
+                    }
+                    // Otherwise, process nested arrays
+                    return subArray.map(innerArray => {
+                        return Array.isArray(innerArray) ? combineFactors(innerArray) : innerArray;
+                    });
+                }
+                return subArray; // If not an array, return as is
+            });
+        }
+        else {
           // If mainArray.length <= 1, process subArray directly
           return mainArray.map(subArray => {
             // Check if subArray is valid before applying combineFactors
@@ -2387,36 +2396,25 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
           let check;
           let factorCombinations = [];
           if (firstKey === "Either" || firstKey === "Envelope") {
-            // Prepare separate arrays
             let modifiedArray = [];
             let nonModifiedArray = [];
-        
-            // Manipulate the either object before processing
             const modifiedEither = either.map(eitherArray => {
                 if (Array.isArray(eitherArray) && eitherArray.length > 0) {
-                    // Check if all inner objects have the same previousKey
                     const allHaveSamePreviousKey = eitherArray.every(obj => {
                         const previousKeys = Object.values(obj).map(innerObj => innerObj?.previousKey);
                         return previousKeys.every(key => key === previousKeys[0]);
                     });
-        
-                    // If previousKey is "Either", break into separate arrays
                     if (allHaveSamePreviousKey && Object.values(eitherArray[0])[0]?.previousKey === "Either") {
-                        const separatedArrays = eitherArray.map(obj => [obj]); // Break into separate arrays
-                        modifiedArray.push(...separatedArrays); // Push separated arrays to modifiedArray
-                       
+                        const separatedArrays = eitherArray.map(obj => [obj]); 
+                        modifiedArray.push(...separatedArrays);      
                     } else if (eitherArray.length === 1) {
-                        // Directly push the array to nonModifiedArray if length is 1
                         nonModifiedArray.push(eitherArray);
-
                     }
                 }
                 return eitherArray;
             }); 
             let combinedArrays = [];
-        
             if (modifiedArray.length > 0 && nonModifiedArray.length > 0) {
-                // Combine the first element of modifiedArray with all nonModifiedArray elements
                 modifiedArray.forEach(modified => {
                     nonModifiedArray.forEach(nonModified => {
                         combinedArrays.push([...modified, ...nonModified]);
@@ -2425,10 +2423,8 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
             }
             let result = combineMatchingFactors(combinedArrays, factorIndex, i, either_specialKeys);
             factorCombinations.push(...result);
-        
             console.log(factorCombinations);
         } else if (firstKey === "Add") {
-            // Prepare separate arrays for "Add" case
             let modifiedArray = [];
             let nonModifiedArray = [];
             const modifiedEither = either.map(eitherArray => {
@@ -2439,9 +2435,8 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
                         return previousKeys.every(key => key === previousKeys[0]);
                     });
                     if (allHaveSamePreviousKey && Object.values(eitherArray[0])[0]?.previousKey === "Either") {
-                        const separatedArrays = eitherArray.map(obj => [obj]); // Break into separate arrays
-                        modifiedArray.push(...separatedArrays); // Push separated arrays to modifiedArray
-                         // Return an empty array as we've handled this case
+                        const separatedArrays = eitherArray.map(obj => [obj]); 
+                        modifiedArray.push(...separatedArrays); 
                     } 
                 }
                 else if (
@@ -2469,39 +2464,47 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
         }
         add.forEach(addArray => {
           if (Array.isArray(addArray) && addArray.length > 0) {
-            const addresult = [];
-            addArray.forEach(subArray => {
-              if (Array.isArray(subArray)) {
-                // Flatten the subArray once before processing it
-                const flatSubArray = subArray.flat();
+            const allComb = [];
         
-                // Process the flattened array
-                flatSubArray.forEach(item => {
-                  factorCombinations.forEach(factorCombination => {
-                    let combinedResult = [];
-                    Object.keys(item).forEach(key => {
-                      if (!isNaN(parseInt(key, 10))) {
-                        // If the key is a number, go deeper into its nested structure
-                        const nestedObj = item[key];
-                        Object.keys(nestedObj).forEach(nestedKey => {
-                          const nestedValue = nestedObj[nestedKey];
-                          const loadCaseName = nestedValue.loadCaseName;
-                          const sign = nestedValue.sign;
-                          const factor = nestedValue.factor;
-                          let factorValue;
-                          if (factor !== undefined) {
-                            factorValue = getSingleFactor(factor, factorIndex, i);
-                          }
-                          if (factorValue !== undefined && factorValue !== null) {
-                            combinedResult.push({ loadCaseName, sign, factor: factorValue });
-                          }
-                        });
-                      } else {
-                        // Follow the current process for non-numeric keys
-                        const value = item[key];
-                        const loadCaseName = value.loadCaseName;
-                        const sign = value.sign;
-                        const factor = value.factor;
+            // Recursive backtracking function
+            const generateCombinations = (subArrays, index, currentCombination) => {
+              if (index === subArrays.length) {
+                // Base case: Add the completed combination to the result
+                allComb.push([...currentCombination]);
+                return;
+              }
+        
+              // Iterate through each item in the current subarray
+              const currentSubArray = subArrays[index];
+              if (Array.isArray(currentSubArray)) {
+                currentSubArray.forEach(item => {
+                  currentCombination.push(item); // Choose the current item
+                  generateCombinations(subArrays, index + 1, currentCombination); // Recurse to the next subarray
+                  currentCombination.pop(); // Backtrack
+                });
+              }
+            };
+        
+            // Start the backtracking process
+            generateCombinations(addArray, 0, []);
+            if (allComb.length === 0 && addArray.length > 0) {
+              allComb.push(...addArray);
+          }
+            // Process all generated combinations
+            allComb.forEach(combination => {
+            factorCombinations.forEach(factorCombination => {
+              const combinedResult = [];
+              if (Array.isArray(combination)) {
+                // If combination is an array, iterate using forEach
+                combination.forEach(item => {
+                  Object.keys(item).forEach(key => {
+                    if (!isNaN(parseInt(key, 10))) {
+                      const nestedObj = item[key];
+                      Object.keys(nestedObj).forEach(nestedKey => {
+                        const nestedValue = nestedObj[nestedKey];
+                        const loadCaseName = nestedValue.loadCaseName;
+                        const sign = nestedValue.sign;
+                        const factor = nestedValue.factor;
                         let factorValue;
                         if (factor !== undefined) {
                           factorValue = getSingleFactor(factor, factorIndex, i);
@@ -2509,28 +2512,74 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
                         if (factorValue !== undefined && factorValue !== null) {
                           combinedResult.push({ loadCaseName, sign, factor: factorValue });
                         }
+                      });
+                    } else {
+                      const value = item[key];
+                      const loadCaseName = value.loadCaseName;
+                      const sign = value.sign;
+                      const factor = value.factor;
+                      let factorValue;
+                      if (factor !== undefined) {
+                        factorValue = getSingleFactor(factor, factorIndex, i);
                       }
-                    });
-        
-                    // If combinedResult has data, push it along with factorCombination into allCombinations
-                    if (combinedResult.length > 0) {
-                      if (factorCombination.combinations) {
-                        // Extract arrays from `factorCombination.combinations`
-                        const extractedCombinations = factorCombination.combinations;
-                        extractedCombinations.forEach(innerArray => {
-                          // Temporarily hold the combined result for the current innerArray
-                          const tempCombinedResult = [...combinedResult, ...innerArray];
-                          allCombinations.push(tempCombinedResult); // Push a copy to avoid mutation
-                        });
-                      } else {
-                        // If factorCombination.combinations doesn't exist, push factorCombination directly
-                        combinedResult.push(...factorCombination);
-                        allCombinations.push(combinedResult);
+                      if (factorValue !== undefined && factorValue !== null) {
+                        combinedResult.push({ loadCaseName, sign, factor: factorValue });
                       }
                     }
                   });
                 });
+              } else if (typeof combination === "object" && combination !== null) {
+                // If combination is an object, process its keys
+                Object.keys(combination).forEach(key => {
+                  if (!isNaN(parseInt(key, 10))) {
+                    const nestedObj = combination[key];
+                    Object.keys(nestedObj).forEach(nestedKey => {
+                      const nestedValue = nestedObj[nestedKey];
+                      const loadCaseName = nestedValue.loadCaseName;
+                      const sign = nestedValue.sign;
+                      const factor = nestedValue.factor;
+                      let factorValue;
+                      if (factor !== undefined) {
+                        factorValue = getSingleFactor(factor, factorIndex, i);
+                      }
+                      if (factorValue !== undefined && factorValue !== null) {
+                        combinedResult.push({ loadCaseName, sign, factor: factorValue });
+                      }
+                    });
+                  } else {
+                    const value = combination[key];
+                    const loadCaseName = value.loadCaseName;
+                    const sign = value.sign;
+                    const factor = value.factor;
+                    let factorValue;
+                    if (factor !== undefined) {
+                      factorValue = getSingleFactor(factor, factorIndex, i);
+                    }
+                    if (factorValue !== undefined && factorValue !== null) {
+                      combinedResult.push({ loadCaseName, sign, factor: factorValue });
+                    }
+                  }
+                });
               }
+              
+                  // Add combinations with factors
+                  if (combinedResult.length > 0) {
+                    if (factorCombination.combinations) {
+                      const extractedCombinations = factorCombination.combinations;
+                      extractedCombinations.forEach(innerArray => {
+                        const tempCombinedResult = [...combinedResult, ...innerArray];
+                        allCombinations.push(tempCombinedResult);
+                      });
+                    } else {
+                      const tempCombinedResult = [...combinedResult, ...factorCombination];
+                      allCombinations.push(tempCombinedResult);
+                     
+                    }
+                  } else {
+                    combinedResult.push(...factorCombination);
+                    allCombinations.push(combinedResult);
+                  }
+              });
             });
           }
         });
@@ -2545,7 +2594,6 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
       console.log('All Combinations:', allCombinations);
       const extractedValues = Object.values(extractedFactorsStore);
 const mergeArray = [];
-// Helper function to generate permutations
 function getCustomCombinations(arrays,arrays_1) {
   const result = [];
   const filteredArrays = arrays.filter(
@@ -2553,13 +2601,10 @@ function getCustomCombinations(arrays,arrays_1) {
   );
   const flatArrays1 = arrays_1.flat();
   function buildCombination(currentCombination, currentIndex) {
-    // Base case: if we've built a combination using elements from all non-empty arrays, add it to the result
     if (currentIndex === filteredArrays.length) {
       result.push([...currentCombination]);
       return;
     }
-
-    // If the current array is empty, skip to the next one
     if (filteredArrays[currentIndex].length === 0) {
       buildCombination(currentCombination, currentIndex + 1);
       return;
@@ -2577,7 +2622,6 @@ function getCustomCombinations(arrays,arrays_1) {
       });
     }
   }
-  // Start the recursive process with an empty combination and from the first index
   buildCombination([], 0);
   filteredArrays.forEach(filteredArray => {
     if (JSON.stringify(filteredArray) !== JSON.stringify(flatArrays1)) {
@@ -2587,8 +2631,6 @@ function getCustomCombinations(arrays,arrays_1) {
 
   return result;
 }
-
-// Outer loop iterating over j
 for (let j = 0; j < 5; j++) {
   let iterationArray = [];
   for (let i = 0; i < 5; i++) {
@@ -2606,7 +2648,6 @@ for (let j = 0; j < 5; j++) {
         elementsToPermute.push(nonEmptyElements);
       }
     }
-    // Generate permutations for elementsToPermute and merge with fixedElement
     console.log(elementsToPermute);
     const permutations = getCustomCombinations(elementsToPermute,elementsToPermute_first);
     permutations.forEach(perm => {
@@ -2616,7 +2657,6 @@ for (let j = 0; j < 5; j++) {
       }
     });
   }
-  // Append iterationArray to mergeArray if it contains results
   if (iterationArray.length > 0) {
     mergeArray.push([...iterationArray]);
   }
