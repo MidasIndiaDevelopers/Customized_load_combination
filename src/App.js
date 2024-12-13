@@ -2175,9 +2175,6 @@ function join(factorCombinations) {
             });
           }
         });
-        
-        
-        
         // Check if any object inside specialKeys contains 'Either' as a key
         specialKeys.forEach(innerObj => {
           if (innerObj && typeof innerObj === "object") {
@@ -2217,8 +2214,6 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
      if(check) {
       // Store extracted factors for each `arr` in `either` separately
       const separateExtractedFactors = [];
-  
-      // Process each array in `either` individually
       either.forEach((arr, arrIndex) => {
           if (Array.isArray(arr)) {
               const extractedFactors = arr.flatMap(subArray => {
@@ -2576,8 +2571,17 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
                      
                     }
                   } else {
-                    combinedResult.push(...factorCombination);
-                    allCombinations.push(combinedResult);
+                    if (factorCombination.combinations) {
+                      const extractedCombinations = factorCombination.combinations;
+                      extractedCombinations.forEach(innerArray => {
+                        const tempCombinedResult = [...innerArray];
+                        allCombinations.push(tempCombinedResult);
+                      });
+                    } else {
+                      const tempCombinedResult = [...factorCombination];
+                      allCombinations.push(tempCombinedResult);
+                     
+                    }
                   }
               });
             });
@@ -2590,9 +2594,36 @@ extractedFactorsStore[factorIndex][i] = extractedFactors;
           }
         }
       }
-      console.log('Extracted Factors:', extractedFactorsStore);
-      console.log('All Combinations:', allCombinations);
-      const extractedValues = Object.values(extractedFactorsStore);
+      let nestedArrayCount = 0; // Variable to store the count of nested arrays
+
+      outerLoop: for (const [key, value] of Object.entries(extractedFactorsStore)) {
+        // Check if the value is an array
+        if (Array.isArray(value)) {
+          for (const innerArray of value) {
+            // Check if innerArray is a nested array
+            if (Array.isArray(innerArray) && innerArray.length > 0) {
+              // Check if innerArray contains items that are themselves arrays
+              if (innerArray.some(item => 
+                Array.isArray(item) && item.length > 0 && item.some(subItem => Array.isArray(subItem))
+              )) {
+                // If item contains nested arrays inside it, store the length of innerArray
+                nestedArrayCount += innerArray.length;
+                break outerLoop; // Exit both loops after processing the first valid innerArray
+              } else {
+                // If no nested arrays inside items, just add the length of innerArray
+                // nestedArrayCount += innerArray.length;
+              }
+            }
+          }
+        }
+      }
+
+console.log('Extracted Factors:', extractedFactorsStore);
+console.log('All Combinations:', allCombinations);
+console.log('Number of Nested Arrays from First Inner Arrays:', nestedArrayCount);
+
+      
+const extractedValues = Object.values(extractedFactorsStore);
 const mergeArray = [];
 function getCustomCombinations(arrays,arrays_1) {
   const result = [];
@@ -2611,16 +2642,22 @@ function getCustomCombinations(arrays,arrays_1) {
     }
     if (currentIndex === 0) {
       filteredArrays[currentIndex].forEach((subArray, index) => {
-        if (filteredArrays[currentIndex + 1] !==  undefined) {
+        if (filteredArrays[currentIndex + 1] !== undefined) {
           // Pair the subArray from the current index with the opposite element in the next array
-          const nextSubArray = filteredArrays[currentIndex + 1][filteredArrays[currentIndex + 1].length - 1 - index];
-          currentCombination.push(subArray, nextSubArray); // Add both subarrays to the combination
-          buildCombination(currentCombination, currentIndex + 2); // Skip to the next index
-          currentCombination.pop(); // Backtrack to try the next combination
-          currentCombination.pop(); // Backtrack for the paired subarray
+          const nextSubArray =
+            filteredArrays[currentIndex + 1][filteredArrays[currentIndex + 1].length - 1 - index];
+          
+          // Only push if both arrays have length > 0
+          if (subArray.length > 0 && nextSubArray.length > 0) {
+            currentCombination.push(subArray, nextSubArray); // Add both subarrays to the combination
+            buildCombination(currentCombination, currentIndex + 2); // Skip to the next index
+            currentCombination.pop(); // Backtrack to try the next combination
+            currentCombination.pop(); // Backtrack for the paired subarray
+          }
         }
       });
     }
+    
   }
   buildCombination([], 0);
   filteredArrays.forEach(filteredArray => {
@@ -2631,10 +2668,17 @@ function getCustomCombinations(arrays,arrays_1) {
 
   return result;
 }
+let loopCount = nestedArrayCount > 0 ? nestedArrayCount : 1;
 for (let j = 0; j < 5; j++) {
   let iterationArray = [];
   for (let i = 0; i < 5; i++) {
-    const baseInnerArray = extractedValues[i][j]; // Array for the fixed element
+    for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
+      let baseInnerArray;
+      if ( loopCount === 1) { 
+        baseInnerArray = extractedValues[i][j]
+      } else {
+        baseInnerArray = extractedValues[i][j][loopIndex]; 
+      }
     const fixedElement = baseInnerArray[0]; // First element of i-th array for fixed position
     // Initialize elementsToPermute with rest of elements in the current i-th array
     let elementsToPermute = [baseInnerArray.slice(1)];
@@ -2642,9 +2686,14 @@ for (let j = 0; j < 5; j++) {
     // Additional loop for other i values (0 to 4), except the current i
     for (let k = 0; k < 5; k++) {
       if (k === i) continue; // Skip the current i index to avoid repetition
-      const additionalArray = extractedValues[k][j];
+      let additionalArray;
+      if ( loopCount === 1) { 
+        additionalArray = extractedValues[k][j]
+      } else {
+        additionalArray = extractedValues[k][j][loopIndex]; 
+      }
       if (additionalArray && additionalArray.length > 1) {
-        const nonEmptyElements = additionalArray.slice(1).filter(subArr => subArr.length > 0);
+        const nonEmptyElements = additionalArray.slice(1);
         elementsToPermute.push(nonEmptyElements);
       }
     }
@@ -2661,6 +2710,7 @@ for (let j = 0; j < 5; j++) {
     mergeArray.push([...iterationArray]);
   }
 }
+ }
 console.log(mergeArray);
       function generateCombinations(arrays, tempResult = [], index = 0, finalCombinations = []) {
         // Base case: If we've processed all arrays, push the combination to finalCombinations
@@ -2755,8 +2805,7 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
   }
 }
 console.log(addresult);
-let allCombinations_multi = []; // To store the final results
-// Loop through each main array in combinedResult
+let allCombinations_multi = []; 
 combinedResult.forEach((mainArray) => {
   // Loop through each inner array in mainArray
   mainArray.forEach((innerArray) => {
@@ -2796,10 +2845,8 @@ function flattenArray(arr) {
       return acc;
   }, []);
 }
-
-// Process flattenedCombinations to ensure no subarrays are present
 const fullyFlattenedCombinations = flattenedCombinations.map(array => flattenArray(array));
-
+console.log(fullyFlattenedCombinations);
 // Combine the fully flattened combinations with allCombinations
 const joinedCombinations = [...fullyFlattenedCombinations, ...allCombinations];
 
