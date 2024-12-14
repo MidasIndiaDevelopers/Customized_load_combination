@@ -1644,40 +1644,33 @@ function join_factor(finalCombinations_sign) {
             } else {
               if (currentArray.length > 0) {
                 const length = currentArray[0].length;
-                for (let i = 0; i < length; i++) {
+                // for (let i = 0; i < length; i++) {
                   let combinedArray = [];
                   currentArray.forEach(subArray => {
-                    if (Array.isArray(subArray) && subArray[i]) {
-                      combinedArray.push(subArray[i]);
-                    } else {
+                    // if (Array.isArray(subArray) && subArray[i]) {
+                    //   combinedArray.push(subArray[i]);
+                    // } else {
                       combinedArray.push(subArray);
-                    }
+                    // }
                   });
                   mainArrayGroup.push([...deepFlatten(combinedArray)]);
                   combinedArray = [];
-                }
+                // }
               }
             }
           } else {
             mainArray.forEach(currentArray => {
               if (currentArray.length > 0) {
-                  // Initialize a separate group for the currentArray
                   let currentArrayGroup = [];
-          
-                  // Check if `currentArray` contains subarrays at any level
                   const containsNestedSubArray = currentArray.some(item => {
                       if (Array.isArray(item)) {
-                          // Check deeply within `item` for subarrays
                           return item.some(subItem => Array.isArray(subItem));
                       }
                       return false;
                   });
-          
                   if (!containsNestedSubArray) {
-                      // If no subarrays exist, push the flattened currentArray directly into currentArrayGroup
                       currentArrayGroup.push([...deepFlatten(currentArray)]);
                   } else {
-                      // Process each subarray individually
                       const length = currentArray[0].length;
                       for (let i = 0; i < length; i++) {
                           let combinedArray = [];
@@ -1689,39 +1682,29 @@ function join_factor(finalCombinations_sign) {
                           currentArrayGroup.push([...deepFlatten(combinedArray)]);
                       }
                   }
-          
-                  // Add the currentArrayGroup to the mainArrayGroup
                   mainArrayGroup.push(currentArrayGroup);
               }
-          });
-          
-          // Push the processed mainArrayGroup into flattenedAddObj
-                    
+          });         
           }
           flattenedAddObj.push(mainArrayGroup);
         }
       });
   }
-    // Flatten envelopeObj
     if (Array.isArray(envelopeObj)) {
       envelopeObj.forEach(arr => {
         if (Array.isArray(arr)) {
-          const groupedArray = []; // To group subarrays together
+          const groupedArray = []; 
           arr.forEach((subArr) => {
             if (Array.isArray(subArr)) {
-              // Flatten each subarray and push it into the grouped array
               groupedArray.push(deepFlatten(subArr));
             } else {
-              // If it's not a subarray, directly push it
               groupedArray.push(subArr);
             }
           });
-          // Push the grouped array as a single entry into the final output
           if (groupedArray.length > 0) {
             flattenedEnvelopeObj.push(groupedArray);
           }
         } else {
-          // If the current element is not an array, directly push it
           flattenedEnvelopeObj.push(arr);
         }
       });
@@ -1732,7 +1715,6 @@ function join_factor(finalCombinations_sign) {
       items.forEach(item => {
         if (item && typeof item === 'object') {
           if (item.loadCaseName && item.factor) {
-            // Logic for handling loadCaseName and factor
             const key = `${item.loadCaseName}|${item.sign}`;
             if (!combinedResult[key]) {
               combinedResult[key] = {
@@ -1744,7 +1726,6 @@ function join_factor(finalCombinations_sign) {
             }
             mergeFactors(combinedResult[key].factor, item.factor);
           } else if (item.specialKeys) {
-            // Logic for handling specialKeys
             const key = `${item.previousKey}|specialKeys`;
             if (!combinedResult[key]) {
               combinedResult[key] = {
@@ -1752,7 +1733,6 @@ function join_factor(finalCombinations_sign) {
                 previousKey: item.previousKey
               };
             }
-            // Merge the specialKeys if any
             mergeFactors(combinedResult[key].specialKeys, item.specialKeys);
           }
         }
@@ -2631,6 +2611,8 @@ function getCustomCombinations(arrays,arrays_1) {
     arr => arr.some(subArray => subArray.length > 0)
   );
   const flatArrays1 = arrays_1.flat();
+  // Store the length of arrays_1
+  const arrays1Length = arrays_1.length;
   function buildCombination(currentCombination, currentIndex) {
     if (currentIndex === filteredArrays.length) {
       result.push([...currentCombination]);
@@ -2649,7 +2631,11 @@ function getCustomCombinations(arrays,arrays_1) {
           
           // Only push if both arrays have length > 0
           if (subArray.length > 0 && nextSubArray.length > 0) {
-            currentCombination.push(subArray, nextSubArray); // Add both subarrays to the combination
+            if (arrays1Length === 1) {
+              currentCombination.push(nextSubArray); // Push only nextSubArray
+            } else {
+              currentCombination.push(subArray, nextSubArray); // Push both subArray and nextSubArray
+            }
             buildCombination(currentCombination, currentIndex + 2); // Skip to the next index
             currentCombination.pop(); // Backtrack to try the next combination
             currentCombination.pop(); // Backtrack for the paired subarray
@@ -2669,10 +2655,10 @@ function getCustomCombinations(arrays,arrays_1) {
   return result;
 }
 let loopCount = nestedArrayCount > 0 ? nestedArrayCount : 1;
-for (let j = 0; j < 5; j++) {
+for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
   let iterationArray = [];
+for (let j = 0; j < 5; j++) {
   for (let i = 0; i < 5; i++) {
-    for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
       let baseInnerArray;
       if ( loopCount === 1) { 
         baseInnerArray = extractedValues[i][j]
@@ -2706,9 +2692,10 @@ for (let j = 0; j < 5; j++) {
       }
     });
   }
-  if (iterationArray.length > 0) {
-    mergeArray.push([...iterationArray]);
-  }
+ 
+}
+if (iterationArray.length > 0) {
+  mergeArray.push([...iterationArray]);
 }
  }
 console.log(mergeArray);
