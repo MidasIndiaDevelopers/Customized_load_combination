@@ -869,7 +869,7 @@ function combineAddEither(inputObj) {
   
         if (parentKey === "Either" || (parentKey === "Add" && firstKey === "Either") && temp.length > 0) {
           eitherArray.push(temp);
-        } else if (parentKey === "Add" && (!firstKey || firstKey === "Add") && temp.length > 0) {
+        } else if (parentKey === "Add" && (!firstKey || firstKey === "Add" || firstKey === "Envelope") && temp.length > 0) {
           addObj.push(temp);
         } else if (parentKey === "Envelope" || (parentKey === "Add" && firstKey === "Envelope") && temp.length > 0) {
           envelopeObj.push(temp);   
@@ -894,9 +894,9 @@ function multipleFactor(input) {
   const addObj = [];
 
   input.forEach((subArray, subArrayIndex) => {
-    let tempArray = []; // Temporary array for the current subArray
-    let loadCaseNames = []; // Store the loadCaseName of the current object
-    let additionalArray = []; // Additional array to collect matches
+    let tempArray = []; 
+    let loadCaseNames = []; 
+    let additionalArray = []; 
 
     subArray.forEach((item, itemIndex) => {
       if (item === null) return;
@@ -907,13 +907,11 @@ function multipleFactor(input) {
       if (typeof item === "object" && item !== null && Object.keys(item).length > 0) {
         Object.keys(item).forEach((key) => {
           if (key === "specialKeys") {
-            // Handle specialKeys
             temp.push({
-              specialKeys: item.specialKeys, // Include specialKeys in the output
+              specialKeys: item.specialKeys, 
               previousKey,
             });
           } else if (!isNaN(Number(key))) {
-            // Extract loadCaseName, sign, and factor properties if the key is a number
             if (item[key] && item[key].loadCaseName && item[key].sign && item[key].factor) {
               loadCaseNames.push(item[key].loadCaseName);
               temp.push({
@@ -925,15 +923,22 @@ function multipleFactor(input) {
             }
           } else {
             if (item.loadCaseName && item.sign && item.factor) {
+              function cleanFactorValues(factor) {
+                if (Array.isArray(factor)) {
+                  return factor.map((value) => (Array.isArray(value) ? cleanFactorValues(value) : (isNaN(value) ? undefined : value)));
+                }
+                return isNaN(factor) ? undefined : factor;
+              }
+              
               if (Array.isArray(item.factor)) {
-                // Ensure factor values are numbers or undefined
-                item.factor = item.factor.map((value) => (isNaN(value) ? undefined : value));
+                // Ensure factor values are numbers or undefined in multi-dimensional arrays
+                item.factor = cleanFactorValues(item.factor);
               }
               temp.push({
                 loadCaseName: item.loadCaseName,
                 sign: item.sign,
                 factor: item.factor,
-                previousKey, // Add previousKey to each entry
+                previousKey,
               });
             }
           }
@@ -953,7 +958,7 @@ function multipleFactor(input) {
             }
           });
         }
-        if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
+        if (arraysAreEqual(loadCaseNames, loadCaseName_temp) && loadCaseNames.length > 0 && loadCaseName_temp.length > 0) {
           let matchArray = [];
           temp = [];
           Object.keys(nextItem).forEach((nextKey) => {
@@ -991,7 +996,7 @@ function multipleFactor(input) {
             });
           }
 
-          if (arraysAreEqual(loadCaseNames, loadCaseName_temp)) {
+          if (arraysAreEqual(loadCaseNames, loadCaseName_temp) && loadCaseNames.length > 0 && loadCaseName_temp.length > 0) {
             let matchArray = [];
             temp = [];
             Object.keys(nextItem).forEach((nextKey) => {
@@ -1392,7 +1397,6 @@ if (values["Generate inactive load combinations in midas"]) {
           }
         }
         for (const subArray of factorCombination) {
-       
   if (subArray.length > 0) {
     // Pass the flattened subArray to combineArrays
     combineArrays(subArray);
@@ -2877,6 +2881,120 @@ return joinedCombinations;
     }
 
     const addJoin = [];
+    // if (either.length === 0 && envelope.length === 0 && add.length > 0) {
+    //   const combined = [];
+    
+    //   for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
+    //     for (let i = 0; i < 5; i++) {
+    //       let allCombinations = [];
+    //       let shouldBreak = false; // Flag to determine whether to break the outer loop
+    
+    //       for (const addArray of add) { // Replaced forEach with for...of
+    //         if (Array.isArray(addArray) && addArray.length > 0) {
+    //           for (const item of addArray) { // Replaced forEach with for...of
+    //             // Process each array in the item separately
+    //             const processItemArray = (itemObj) => {
+    //               let subArrayCombination = [];
+    
+    //               Object.keys(itemObj).forEach(key => {
+    //                 if (!isNaN(parseInt(key, 10))) {
+    //                   const nestedObj = itemObj[key];
+    //                   Object.keys(nestedObj).forEach(nestedKey => {
+    //                     if (
+    //                       nestedKey === "null|specialKeys" ||
+    //                       nestedKey === "Add|specialKeys" ||
+    //                       nestedKey === "Either|specialKeys" ||
+    //                       nestedKey.includes("|specialKeys")
+    //                     ) {
+    //                       return;
+    //                     }
+    //                     const value = nestedObj[nestedKey];
+    //                     const loadCaseName = value.loadCaseName;
+    //                     const sign = value.sign;
+    //                     const factor = value.factor[factorIndex];
+    //                     let factorValue;
+    
+    //                     if (Array.isArray(factor)) {
+    //                       factorValue = getSingleFactor(factor, factorIndex, i);
+    //                     } else {
+    //                       factorValue = factor;
+    //                     }
+    //                     if (factorValue !== undefined && factorValue !== 0) {
+    //                       const combinedResult = { loadCaseName, sign, factor: factorValue };
+    //                       subArrayCombination.push(combinedResult);
+    //                       if (!Array.isArray(factor)) {
+    //                         shouldBreak = true;
+    //                         return;
+    //                       }
+    //                     }
+    //                   });
+    //                 } else {
+    //                   const value = itemObj[key];
+    //                   const loadCaseName = value.loadCaseName;
+    //                   const sign = value.sign;
+    //                   let factor;
+    //                   if (value.factor !== undefined) {
+    //                     factor = value.factor[factorIndex];
+    //                   }
+    //                   let factorValue;
+    
+    //                   if (Array.isArray(factor)) {
+    //                     factorValue = getSingleFactor(factor, factorIndex, i);
+    //                   } else {
+    //                     factorValue = factor;
+    //                   }
+    
+    //                   if (factorValue !== undefined && factorValue !== 0) {
+    //                     const combinedResult = { loadCaseName, sign, factor: factorValue };
+    //                     subArrayCombination.push(combinedResult);
+    
+    //                     if (!Array.isArray(factor)) {
+    //                       shouldBreak = true;
+    //                       return;
+    //                     }
+    //                   }
+    //                 }
+    //               });
+    
+    //               if (subArrayCombination.length > 0) {
+    //                 allCombinations.push(subArrayCombination);
+    //               }
+    //             };
+    //             const commonArray = []; // Common array to hold all subItem manipulations
+
+    //             if (Array.isArray(item)) {
+    //               for (const subItem of item) { // Replaced forEach with for...of
+    //                 const result = processItemArray(subItem); // Process the subItem
+    //                 if (result && result.length > 0) {
+    //                   commonArray.push(result); // Add result to common array
+    //                 }
+    //                 if (shouldBreak) break; // Break the loop if needed
+    //               }
+    //             } else {
+    //               // If item is a single object, process it directly
+    //               const result = processItemArray(item);
+    //               if (result && result.length > 0) {
+    //                 commonArray.push(result); // Add result to common array
+    //               }
+    //             }
+    //             if (shouldBreak) break; // Exit the addArray loop
+    //           }
+    //         }
+    //         if (shouldBreak) break; // Exit the add loop
+    //       }
+    
+    //       if (allCombinations.length > 0) {
+    //         combined.push(allCombinations);
+    //       }
+    
+    //       if (shouldBreak) break; // Exit the 'i' loop
+    //     }
+    //   }
+    
+    //   addJoin.push(combined);
+    //   const flattenedAddJoin = addJoin.flat(1); // Flatten by one level
+    //   joinArray.push(flattenedAddJoin);
+    // }
     if (either.length === 0 && envelope.length === 0 && add.length > 0) {
       const combined = [];
     
@@ -2936,7 +3054,10 @@ return joinedCombinations;
                     const value = item[key];
                     const loadCaseName = value.loadCaseName;
                     const sign = value.sign;
-                    const factor = value.factor[factorIndex];
+                    let factor;
+                    if (value.factor !== undefined) {
+                     factor = value.factor[factorIndex];
+                    }
                     let factorValue;
     
                     if (Array.isArray(factor)) {
@@ -2983,7 +3104,6 @@ return joinedCombinations;
       const flattenedAddJoin = addJoin.flat(1); // Flatten by one level
       joinArray.push(flattenedAddJoin);
     }
-    
   }
   console.log("Extracted Factors Store: ", extractedFactorsStore);
   return joinArray;
@@ -3594,7 +3714,15 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   const handleInputChange = (index, field, value) => {
     setInputValue(value);
     debouncedHandleLoadCombinationChange(index, field, value);
+    const updatedLoadCombinations = [...loadCombinations];
+     updatedLoadCombinations[index][field] = value; // Update the specific field
+     setLoadCombinations(updatedLoadCombinations);
   };
+  const handleDelete = (index) => {
+    const updatedLoadCombinations = loadCombinations.filter((_, i) => i !== index); // Remove the item at the given index
+    setLoadCombinations(updatedLoadCombinations); // Update the state with the new array
+  };
+  
   React.useEffect(() => {
     if (
       !VerifyUtil.isExistQueryStrings("redirectTo") &&
@@ -3704,29 +3832,56 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
 
                {loadCombinations.map((combo, index) => (
       <div key={index} style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #ccc', cursor: 'pointer', backgroundColor: selectedLoadCombinationIndex === index ? '#f0f0f0' : 'white' }} onClick={() => handleLoadCombinationClick(index)}>
-        <div style={{ flex: '0 0 110px', padding: '5px', borderRight: '1px solid #ccc', color: 'black' }}>
-                      {index === loadCombinations.length - 1 ? (
-                        <input
-                          type="text"
-                          value={inputValue}
-                          onChange={(e) =>
-                            handleInputChange(index, 'loadCombination', e.target.value)
-                          }
-                          onBlur={() =>
-                            handleLoadCombinationChange(index, 'loadCombination', inputValue)
-                          }
-                          placeholder=" "
-                          style={{
-                            width: '100%',
-                            border: 'none',
-                            outline: 'none',
-                            backgroundColor: 'transparent',
-                          }}
-                        />
-                      ) : (
-                        <Typography>{combo.loadCombination}</Typography>
-                      )}
-             </div>
+     <div style={{ flex: '0 0 110px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+  {/* First div with input or Typography */}
+  <div style={{ flex: 1 }}>
+    {selectedLoadCombinationIndex === index ? ( // Render input if this is the active row
+      <input
+        type="text"
+        value={combo.loadCombination}
+        onChange={(e) =>
+          handleInputChange(index, 'loadCombination', e.target.value)
+        }
+        placeholder=" "
+        style={{
+          width: '100%',
+          border: 'none',
+          outline: 'none',
+          backgroundColor: 'transparent',
+        }}
+      />
+    ) : (
+      <Typography
+        onDoubleClick={() => handleLoadCombinationClick(index)} // Allow double-click to edit
+        style={{ cursor: 'text' }}
+      >
+        {combo.loadCombination || '---'} {/* Placeholder text if empty */}
+      </Typography>
+    )}
+  </div>
+
+  {selectedLoadCombinationIndex === index && (
+  <div
+    style={{
+      padding: '0px',
+      color: 'black',
+      cursor: 'pointer',
+      display: 'flex',
+      justifyContent: 'center', // Ensure the icon is centered horizontally
+      alignItems: 'center', // Center the icon vertically
+      width: '10px', // Set the width of the delete button container
+      height: '20px', // Set the height of the delete button container
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+      handleDelete(index); // Call delete function on click
+    }}
+  >
+    <Typography style={{ color: 'red', fontSize: '12px' }}>🗑️</Typography>
+  </div>
+  )}
+</div>
+
         <div
               style={{
                 flex: '1 1 65px',
