@@ -16,6 +16,7 @@ import { midasAPI } from "./Function/Common";
 import { VerifyUtil, VerifyDialog } from "@midasit-dev/moaui";
 import ExcelJS from 'exceljs';  
 import { saveAs } from 'file-saver';
+import { last } from 'lodash';
 
 function App() {
 const [selectedLoadCombinationIndex, setSelectedLoadCombinationIndex] = useState(-1);
@@ -613,7 +614,7 @@ else if (dimension > 2) {
             const currentFactorValue = envelopeLoadCase[`factor${factorIndex}`];
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, envelopeLoadCase.sign || '+');
-            if (loadNames.includes(envelopeLoadCase.loadCaseName)) {
+            if (loadNames.includes(envelopeLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, ''))) {
               if (factorIndex === 1) {
                 factorArray = createNDimensionalArray(dimension);
                 for (let i = 1; i <= 5; i++) {
@@ -1017,12 +1018,21 @@ return { secondLastKey, firstKey, eitherArray, addObj , envelopeObj };
 }
 
 function findStrengthCombinations(combinations) {
+  if (values["Generate inactive load combinations in midas"]) {
   return combinations.filter(combo => 
-    combo.active === "Strength" || combo.active === "Service"
+    combo.active === "Strength" || combo.active === "Service" || combo.active === "Inactive"
   );
+  }else {
+    return combinations.filter(combo => 
+      combo.active === "Strength" || combo.active === "Service"
+    );
+  }
 }
 async function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
+  const inactiveCombinations = loadCombinations.filter(combo => combo.active === "Inactive");
+  const loadCombinationValues = inactiveCombinations.map(combo => combo.loadCombination);
+  console.log("Inactive Load Combinations:", loadCombinationValues);
   if (strengthCombinations.length === 0) {
     console.error("No combinations with active set to 'Strength' found.");
   }
@@ -1058,9 +1068,7 @@ async function generateBasicCombinations(loadCombinations) {
   } 
   let allFinalCombinations = [];
   let combinationCounter = 0; 
-  let last_value;
-  let backupCivilCom = { Assign: {} };
-  // Iterate over each strengthCombination
+  let last_value;   let backupCivilCom = { Assign: {} };
   for (const strengthCombination of strengthCombinations) {
     combinationCounter =  combinationCounter + allFinalCombinations.length;
     allFinalCombinations = [];
@@ -1244,8 +1252,6 @@ console.log(joinedCombinations);
           "iTYPE": 0,
           "vCOMB": vCOMB
       };
-      
-      // Then, update the state with setCivilCom
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
       last_value = idx + 1 + combinationCounter + initial_lc;
       });
@@ -1256,6 +1262,7 @@ console.log(joinedCombinations);
       const combinationName = `${comb_name}_Env`;
       let allVCombEntries = [];
       for (const key in backupCivilCom.Assign) {
+        // allVCombEntries = []
         const assignEntry = backupCivilCom.Assign[key];
         if (assignEntry) {
           let endpoint = '';
@@ -1284,7 +1291,7 @@ console.log(joinedCombinations);
         }
       }
       setCivilComeEnv(prevState => {
-        const newAssign = { ...prevState.Assign };
+        let newAssign = { ...prevState.Assign };
         newAssign[`${last_value + 1}`] = {
           "NAME": combinationName,
           "ACTIVE": "STRENGTH",
@@ -1296,271 +1303,13 @@ console.log(joinedCombinations);
       });
     } 
   }
-let inactiveCombinations = [];
-let inactive_combo = [];
-
-if (values["Generate inactive load combinations in midas"]) {
-  let all_inactive = [];
-  // Filter out inactive combinations
-  inactiveCombinations = loadCombinations.filter(combination => combination.active === "Inactive");
-  console.log(inactiveCombinations);
-
-  if (inactiveCombinations.length === 0) {
-    console.warn("No combinations with active set to 'Inactive' found.");
-  } else {
-    // Process each inactive combination
-    for (const inactiveCombination of inactiveCombinations) {
-      let addObj = [];
-      let eitherArray = [];
-      let envelopeObj = [];
-      const comb_name = inactiveCombination.loadCombination;
-      const type = inactiveCombination.type;
-
-      console.log(inactiveCombination);
-      const result = { comb_name, type, factors: [] };
-      let factorCombination = [];
-      
-      let factor_combos = [];
-      // Iterate through each loadCase
-      for (const loadCase of inactiveCombination.loadCases) {
-        let new_combo = [];
-        const loadCaseName = loadCase.loadCaseName; 
-        if (loadNames.includes(loadCaseName)) {
-          if (!result.factors) {
-            result.factors = []; 
-          }
-          result.factors.push(loadCase);
-        } else {
-          const factors = [];
-          for (let factorNum = 1; factorNum <= 5; factorNum++) {
-            const factorKey = `factor${factorNum}`;
-            const factorValue = loadCase[factorKey]; // Default to 1 if undefined
-            factors.push({ factor: factorNum, value: factorValue });
-          }
-          for (let factor = 1; factor <= 5; factor++) {
-            const sign = loadCase.sign || '+';
-            const factorObject = factors.find(f => f.factor === factor);
-
-            if (factorObject && factorObject.value !== undefined && factorObject.value !== "" && factorObject.value !== null && factorObject.value != 0) {
-              const newCombination = createCombinations(
-                loadCase,
-                inactiveCombination,
-                loadCombinations,
-                loadNames,
-                [],
-                factorObject.value,
-                factor,
-                sign
-              );
-              console.log("New Combination for Factor:", factor, newCombination);
-              new_combo.push(newCombination);
-              console.log(new_combo);
-              if (!result.factors) {
-                result.factors = [];
-              }
-            }
-          }
-        }
-      const combine = combineAddEither(new_combo);
-      const sign_combo = permutation_sign(combine);
-      let factor_combo = join_factor(sign_combo);
-      console.log(factor_combo);
-      factor_combos.push(factor_combo);
-      console.log(factor_combos);
-      }
-      
-      for (const subArray of factor_combos) {
-        const combo_join = join(factor_combos);
-        factorCombination.push(combo_join); // Push the result
-      }
-      console.log(factorCombination);
-      if (type === 'Add') {
-        let joinedComb = [];
-        // Recursive helper function to generate combinations from joinArray
-        function combineArrays(arrays, index = 0, currentCombination = []) {
-          if (index === arrays.length) {
-            // If we've combined arrays from all groups, push the result
-            joinedComb.push([...currentCombination]);
-            return;
-          }
-          for (const subArray of arrays[index]) {
-            // Combine the current subArray with the ongoing combination
-            currentCombination.push(...subArray);
-            combineArrays(arrays, index + 1, currentCombination);
-            // Backtrack to explore other combinations
-            currentCombination.length -= subArray.length;
-          }
-        }
-        for (const subArray of factorCombination) {
-  if (subArray.length > 0) {
-    // Pass the flattened subArray to combineArrays
-    combineArrays(subArray);
-    
-    // Push the joined combinations to the all_inactive array
-    all_inactive.push(...joinedComb);
-    
-    // Reset joinedComb for the next iteration
-    joinedComb = [];
-  }
-      }
-     
-        all_inactive.forEach((combArray, idx) => {
-          const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
-          // Prepare the vCOMB structure for this combination
-          let vCOMB = combArray.map((comb) => {
-            // Search for the matching key in loadNames_key
-            const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
-            const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
-            return {
-              "ANAL": analysisType,
-              "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
-              "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
-            };
-          });
-          // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
-          backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
-            "NAME": combinationName,
-            "ACTIVE": "ACTIVE",
-            "bCB": false,
-            "iTYPE": 0,
-            "vCOMB": vCOMB
-        };
-        setCivilCom({ Assign: { ...backupCivilCom.Assign } });
-        });
-    }
-      if (type === "Either") {
-        const concatenatedArray = factorCombination.flat();
-        console.log(concatenatedArray);
-        concatenatedArray.forEach((combArray) => {
-          combArray.forEach(subArray => allFinalCombinations.push(subArray));
-        });
-      
-        // Now, iterate over allFinalCombinations to create and set vCOMB for each combination
-        all_inactive.forEach((combArray, idx) => {
-          combinationCounter++;
-          const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
-          // Prepare the vCOMB structure for this combination
-          let vCOMB = combArray.map((comb) => {
-            // Search for the matching key in loadNames_key
-            const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
-            const analysisType = matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
-            return {
-              "ANAL": analysisType,
-              "LCNAME": comb.loadCaseName, // Assuming comb has a property `loadCaseName`
-              "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor // Assuming comb has properties `sign` and `factor`
-            };
-          });
-          // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
-          backupCivilCom.Assign[`${idx + 1 + combinationCounter}`] = {
-            "NAME": combinationName,
-            "ACTIVE": "ACTIVE",
-            "bCB": false,
-            "iTYPE": 0,
-            "vCOMB": vCOMB
-        };
-        setCivilCom({ Assign: { ...backupCivilCom.Assign } });
-        });
-      }
-      if (all_inactive.length > 0) {
-        // Filter out null or undefined entries in factorCombination
-        const validCombinations = factorCombination.filter(subArray => subArray.length > 0);
-        // Check if validCombinations has entries before pushing
-        if (validCombinations.length > 0) {
-          result.factors.push(...validCombinations); // Add only valid combinations to factors
-        }
-        else {
-          // Push valid factors to respective arrays based on the result type
-          if (result.factors && result.factors.length > 0) {
-            if (result.type === "Add") {
-              addObj.push(...result.factors);
-            } else if (result.type === "Either") {
-              eitherArray.push(...result.factors);
-            } else if (result.type === "Envelope") {
-              envelopeObj.push(...result.factors);
-            }
-          }
-          const combinedArray = {
-            eitherArray: [[[[...eitherArray]]]], // Wrap in one more array
-            addObj: [[[[...addObj]]]],           // Wrap in one more array
-            envelopeObj: [[[[...envelopeObj]]]]    // Wrap in one more array
-          };
-        
-          // Pass combinedArray to permutation_sign
-          const processedResult = permutation_sign(combinedArray);
-        
-          // Log the processed result
-          console.log("Processed Result:", processedResult);
-        
-          // Flatten the arrays for each object in processedResult using flat(4)
-          const flattenedAddObj = processedResult.addObj.flat(3);
-          const flattenedEitherArray = processedResult.eitherArray.flat(3);
-          const flattenedEnvelopeObj = processedResult.envelopeObj.flat(3);
-        
-          // Initialize an array to hold valid factors
-          const validFactors = [];
-        
-          validFactors.push(...flattenedAddObj, ...flattenedEitherArray, ...flattenedEnvelopeObj);
-          result.factors = validFactors;
-          // Log the result.factors after processing
-          console.log("Result Factors:", result.factors);
-        }
-      }
-      console.log("Final Result for Combination:", comb_name, result);
-      const transformedFactors = [];
-
-      const allFactorKeys = [...new Set(
-        result.factors
-            .flatMap(subArray => {
-                if (subArray && Object.keys(subArray).length > 0) { 
-                    return Object.keys(subArray)                  // Flatten the keys of valid subArrays
-                } else {
-                    return []; // If subArray is invalid or empty, return an empty array
-                }
-            })
-            .filter(key => key.startsWith('factor'))             // Keep only keys starting with 'factor'
-    )];
-    
-    if (allFactorKeys.length > 0) {
-      allFactorKeys.forEach((factorKey) => {
-          const subArrayForKey = []; // Group subarrays for the current factor key
-  
-          // Process each subArray for the current factor key
-          result.factors.forEach((subArray) => {
-              const processedSubArray = {
-                  loadCaseName: subArray.loadCaseName,
-                  sign: subArray.sign,
-                  factor: subArray[factorKey], // Handle undefined factor values
-              };
-  
-              // Add the processed object to the current factor key group if valid
-              if (processedSubArray.factor !== undefined && processedSubArray.factor !== "") {
-                  subArrayForKey.push(processedSubArray);
-              }
-          });
-  
-          // Add the group to transformedFactors if it contains valid data
-          if (subArrayForKey.length > 0) {
-              transformedFactors.push(subArrayForKey);
-          }
-      });
-  
-      // Update result.factors with transformed factors
-      result.factors = transformedFactors;
-  } 
-      inactive_combo.push(result);
-    }
-  }
-}
-  console.log("inactive_combo",inactive_combo);
   console.log( "allcomb",allFinalCombinations);
   return allFinalCombinations;
 }
-
 console.log("Civil",civilCom);
 console.log("Civil_env",civilComEnv);
 
 function join_factor(finalCombinations_sign) {
-  // Helper function to recursively flatten nested arrays
   const deepFlatten = (arr) => {
     if (Array.isArray(arr)) {
       return arr.reduce((flat, item) => {
@@ -2877,120 +2626,7 @@ return joinedCombinations;
       joinArray.push(eitherJoin);
     }
     const addJoin = [];
-    // if (either.length === 0 && envelope.length === 0 && add.length > 0) {
-    //   const combined = [];
     
-    //   for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
-    //     for (let i = 0; i < 5; i++) {
-    //       let allCombinations = [];
-    //       let shouldBreak = false; // Flag to determine whether to break the outer loop
-    
-    //       for (const addArray of add) { // Replaced forEach with for...of
-    //         if (Array.isArray(addArray) && addArray.length > 0) {
-    //           for (const item of addArray) { // Replaced forEach with for...of
-    //             // Process each array in the item separately
-    //             const processItemArray = (itemObj) => {
-    //               let subArrayCombination = [];
-    
-    //               Object.keys(itemObj).forEach(key => {
-    //                 if (!isNaN(parseInt(key, 10))) {
-    //                   const nestedObj = itemObj[key];
-    //                   Object.keys(nestedObj).forEach(nestedKey => {
-    //                     if (
-    //                       nestedKey === "null|specialKeys" ||
-    //                       nestedKey === "Add|specialKeys" ||
-    //                       nestedKey === "Either|specialKeys" ||
-    //                       nestedKey.includes("|specialKeys")
-    //                     ) {
-    //                       return;
-    //                     }
-    //                     const value = nestedObj[nestedKey];
-    //                     const loadCaseName = value.loadCaseName;
-    //                     const sign = value.sign;
-    //                     const factor = value.factor[factorIndex];
-    //                     let factorValue;
-    
-    //                     if (Array.isArray(factor)) {
-    //                       factorValue = getSingleFactor(factor, factorIndex, i);
-    //                     } else {
-    //                       factorValue = factor;
-    //                     }
-    //                     if (factorValue !== undefined && factorValue !== 0) {
-    //                       const combinedResult = { loadCaseName, sign, factor: factorValue };
-    //                       subArrayCombination.push(combinedResult);
-    //                       if (!Array.isArray(factor)) {
-    //                         shouldBreak = true;
-    //                         return;
-    //                       }
-    //                     }
-    //                   });
-    //                 } else {
-    //                   const value = itemObj[key];
-    //                   const loadCaseName = value.loadCaseName;
-    //                   const sign = value.sign;
-    //                   let factor;
-    //                   if (value.factor !== undefined) {
-    //                     factor = value.factor[factorIndex];
-    //                   }
-    //                   let factorValue;
-    
-    //                   if (Array.isArray(factor)) {
-    //                     factorValue = getSingleFactor(factor, factorIndex, i);
-    //                   } else {
-    //                     factorValue = factor;
-    //                   }
-    
-    //                   if (factorValue !== undefined && factorValue !== 0) {
-    //                     const combinedResult = { loadCaseName, sign, factor: factorValue };
-    //                     subArrayCombination.push(combinedResult);
-    
-    //                     if (!Array.isArray(factor)) {
-    //                       shouldBreak = true;
-    //                       return;
-    //                     }
-    //                   }
-    //                 }
-    //               });
-    
-    //               if (subArrayCombination.length > 0) {
-    //                 allCombinations.push(subArrayCombination);
-    //               }
-    //             };
-    //             const commonArray = []; // Common array to hold all subItem manipulations
-
-    //             if (Array.isArray(item)) {
-    //               for (const subItem of item) { // Replaced forEach with for...of
-    //                 const result = processItemArray(subItem); // Process the subItem
-    //                 if (result && result.length > 0) {
-    //                   commonArray.push(result); // Add result to common array
-    //                 }
-    //                 if (shouldBreak) break; // Break the loop if needed
-    //               }
-    //             } else {
-    //               // If item is a single object, process it directly
-    //               const result = processItemArray(item);
-    //               if (result && result.length > 0) {
-    //                 commonArray.push(result); // Add result to common array
-    //               }
-    //             }
-    //             if (shouldBreak) break; // Exit the addArray loop
-    //           }
-    //         }
-    //         if (shouldBreak) break; // Exit the add loop
-    //       }
-    
-    //       if (allCombinations.length > 0) {
-    //         combined.push(allCombinations);
-    //       }
-    
-    //       if (shouldBreak) break; // Exit the 'i' loop
-    //     }
-    //   }
-    
-    //   addJoin.push(combined);
-    //   const flattenedAddJoin = addJoin.flat(1); // Flatten by one level
-    //   joinArray.push(flattenedAddJoin);
-    // }
     if (either.length === 0 && envelope.length === 0 && add.length > 0) {
       const combined = [];
     
@@ -3108,6 +2744,7 @@ return joinedCombinations;
       const flattenedAddJoin = addJoin.flat(1); // Flatten by one level
       joinArray.push(flattenedAddJoin);
     }
+  
   }
   console.log("Extracted Factors Store: ", extractedFactorsStore);
   return joinArray;
@@ -3256,7 +2893,7 @@ function permutation_sign(result11) {
             const negativeObj = { ...item, sign: "-" };
             positiveArray.push(positiveObj);
             negativeArray.push(negativeObj);
-          } else if (item.sign === "±") {
+          } else if (item.sign === "±" || item.sign === "∓") {
             const positiveObj = { ...item, sign: "+" };
             const negativeObj = { ...item, sign: "-" };
             dummy.push(positiveObj);
@@ -3291,6 +2928,9 @@ function permutation_sign(result11) {
                 for (const newItem of new_temp) {
                   if (typeof newItem !== 'object' || Array.isArray(newItem)) {
                     temp.push([...combination, ...newItem]);
+                  } else {
+                    // If newItem is not iterable, push it directly with combination
+                    temp.push([...combination, newItem]);
                   }
                 }
               } else {
@@ -3301,9 +2941,14 @@ function permutation_sign(result11) {
         } else {
           if (new_temp.length > 0) {
             for (const newItem of new_temp) {
-              if (positiveArray.length > 0 && negativeArray.length > 0 && typeof(newItem) == "Array") {
+              if (positiveArray.length > 0 && negativeArray.length > 0) {
+                if (typeof newItem !== "object") {
                 temp.push([...positiveArray, ...newItem]);
                 temp.push([...negativeArray, ...newItem]);
+                } else {
+                  temp.push([...positiveArray]);
+                  temp.push([...negativeArray]);
+                }
               } else {
                 temp.push(newItem);
               }
@@ -3416,11 +3061,11 @@ function permutation_sign(result11) {
           }
         }
         if (temp.length === 0) {
-          innerArr.splice(objIndex, 1); // Remove the empty obj from innerArr
-          objIndex--; // Adjust the index after removal to avoid skipping elements
+          innerArr.splice(objIndex, 1); 
+          objIndex--;
         } else {
           obj.length = 0;
-          obj.push(...temp); // Push modified combinations to obj
+          obj.push(...temp); 
         }
       }
     }
@@ -3445,11 +3090,9 @@ async function generateEnvelopeLoadCombination() {
     console.log("civilCom.Assign is empty, no combinations to process.");
     return;
   }
-
-  // Prevent duplicate calls
   if (isGeneratingRef.current) return;
 
-  isGeneratingRef.current = true; // Set the flag
+  isGeneratingRef.current = true; 
 
   try {
     const civilComJson = JSON.stringify(civilCom, null, 2);
@@ -3479,7 +3122,6 @@ async function generateEnvelopeLoadCombination() {
         console.error("Invalid selectedDropListValue:", selectedDropListValue);
         return;
     }
-
     const response = await midasAPI("PUT", endpoint, civilCom);
     console.log(response);
     if(values['Generate envelop load combinations in midas']) {
@@ -3504,7 +3146,7 @@ async function generateEnvelopeLoadCombination() {
       anchorOrigin: { vertical: "top", horizontal: "center" },
     });
   } finally {
-    isGeneratingRef.current = false; // Reset the flag
+    isGeneratingRef.current = false; 
     civilCom.Assign = {};
     civilComEnv.Assign = {};
     console.log("civilCom has been refreshed:", civilCom);
@@ -3516,20 +3158,15 @@ if (Object.keys(civilCom.Assign).length > 0 && !isGeneratingRef.current) {
   generateEnvelopeLoadCombination();
 }
 
-
 const toggleExcelReader = () => {
   fileInputRef.current.click();
 };
 const handleImportClick = () => {
   setImportLoading(true);
-
-  // Simulate file selection process
   toggleExcelReader();
-
-  // Simulate a delay to represent the file handling process
   setTimeout(() => {
-    setImportLoading(false); // Reset loading state
-  }, 5000); // Replace this with your actual import logic
+    setImportLoading(false); 
+  }, 5000); 
 };
 let [loadCombinations, setLoadCombinations] = useState(
   [
@@ -3545,7 +3182,6 @@ let [loadCombinations, setLoadCombinations] = useState(
 }
 ]);
 useEffect(() => {
-  // Ensure there is always an additional empty row at the end
   const lastCombination = loadCombinations[loadCombinations.length - 1];
   if (lastCombination && (
     lastCombination.loadCombination !== '' || 
