@@ -1202,7 +1202,7 @@ console.log(joinedCombinations);
       allFinalCombinations.forEach((combArray, idx) => {
         const combinationName = `${comb_name}_${idx + 1}`;
         let vCOMB = combArray.map((comb) => {
-          console.log('comb', comb);
+          // console.log('comb', comb);
           const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');;
           const match = comb.loadCaseName.match(/\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/);
           const analysisType = match
@@ -2227,6 +2227,7 @@ console.log(fullyFlattenedResult);
       console.log(maxI);
       for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
         console.log(factorIndex);
+        addmulti[factorIndex] = [];
         for (let i = 0; i < maxI; i++) {
           let check;
           let factorCombinations = [];
@@ -2262,6 +2263,7 @@ console.log(fullyFlattenedResult);
               factorCombinations = combineMatchingFactors(either,factorIndex,i,either_specialKeys,type,check=false);
             }
             console.log(factorCombinations);
+            addmulti[factorIndex][i] = factorCombinations;
         } else if (firstKey === "Add") {
             let modifiedArray = [];
             let nonModifiedArray = [];
@@ -2298,6 +2300,7 @@ console.log(fullyFlattenedResult);
               factorCombinations = combineMatchingFactors(either,factorIndex,i,either_specialKeys,type,check=false);
             }
             console.log(factorCombinations);
+            addmulti[factorIndex][i] = factorCombinations;
         }
         const allComb = [];
         if (type != "add") {
@@ -2328,7 +2331,6 @@ console.log(fullyFlattenedResult);
           }
         });}
 const finalCombinations = [];
-
 let joinArrays = (arrays, index, currentCombination) => {
   if (index === arrays.length) {
     finalCombinations.push([...currentCombination.flat()]);
@@ -2716,13 +2718,49 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
   }
 }
 console.log(addresult);
+
+Object.keys(addresult).forEach((outerKey) => {
+  const outerValue = addresult[outerKey];
+
+  // Ensure the outerValue is an object
+  if (typeof outerValue === "object" && outerValue !== null) {   
+    Object.keys(outerValue).forEach((innerKey) => {
+      const innerValue = outerValue[innerKey];
+      if (Array.isArray(innerValue) && innerValue.length > 1) {
+        const combinedArrays = backtrackAndJoin(innerValue);
+        outerValue[innerKey] = combinedArrays;
+      }
+    });
+  }
+});
+
+console.log("Updated addresult:", addresult);
+
 let allCombinations_multi = []; 
-combinedResult.forEach((mainArray) => {
-  mainArray.forEach((innerArray) => {
+const inputCombination = combinedResult.length > 0 ? combinedResult : addmulti;
+if (inputCombination.length > 0 && type !== "add") {
+inputCombination.forEach((mainArray,mainIndex) => {
+  mainArray.forEach((innerArray, innerIndex) => { 
     let combinedSet = [];
     Object.keys(addresult).forEach((key) => {
+      if (Number(key) === mainIndex) {
+        return;
+      }
       const addArray = addresult[key];
-      if (typeof addArray === 'object' && addArray !== null && Object.values(addArray).every(item => Array.isArray(item) && item.length > 0 && item.every(subItem => Array.isArray(subItem) ? subItem.length > 0 && subItem.every(nestedItem => !Array.isArray(nestedItem) || nestedItem.length > 0) : true))) {
+      if (
+        typeof addArray === 'object' &&
+        addArray !== null &&
+        Object.values(addArray).every(item =>
+          Array.isArray(item) &&
+          item.length > 0 &&
+          item.every(subItem =>
+            Array.isArray(subItem)
+              ? subItem.length > 0 &&
+                subItem.every(nestedItem => !Array.isArray(nestedItem) || nestedItem.length > 0)
+              : true
+          )
+        )
+      ) {
         innerArray.forEach((subArray, index) => {
           const correspondingAddSubArray = addArray[key];
           if (subArray && correspondingAddSubArray) {
@@ -2730,24 +2768,22 @@ combinedResult.forEach((mainArray) => {
             let combinedArray;
             modifiedSubArray.forEach((nestedArray) => {
               nestedArray.forEach((subSubArray) => {
-                  combinedArray = [...subArray]; 
-                  combinedArray.push(...subSubArray); 
-                  combinedSet.push(combinedArray); 
+                combinedArray = [...subArray];
+                combinedArray.push(...subSubArray);
+                combinedSet.push(combinedArray);
               });
-              combinedArray = []; 
-          });
-          
+              combinedArray = [];
+            });
           }
-        }); 
+        });
       }
       if (combinedSet.length > 0) {
         allCombinations_multi.push(combinedSet);
       }
       combinedSet = [];
     });
-    
   });
-});
+}); }
 console.log(allCombinations_multi);
 const flattenedCombinations = allCombinations_multi.flat(1);
 function backtrackAndJoin(array) {
@@ -2878,11 +2914,9 @@ function permutation_sign(result11) {
             for (const combination of combinations) {
               if (new_temp.length > 0) {
                 for (const newItem of new_temp) {
-                  // Check if newItem is iterable (i.e., an array)
                   if (Array.isArray(newItem)) {
                     temp.push([...combination, ...newItem]);
                   } else {
-                    // If newItem is not iterable, push it directly with combination
                     temp.push([...combination, newItem]);
                   }
                 }
