@@ -1033,18 +1033,18 @@ return { secondLastKey, firstKey, eitherArray, addObj , envelopeObj };
 function findStrengthCombinations(combinations) {
   if (values["Generate inactive load combinations in midas"]) {
   return combinations.filter(combo => 
-    combo.active === "Strength" || combo.active === "Service" || combo.active === "Inactive"
+    combo?.active === "Strength" || combo?.active === "Service" || combo?.active === "Inactive"
   );
   }else {
     return combinations.filter(combo => 
-      combo.active === "Strength" || combo.active === "Service"
+      combo?.active === "Strength" || combo?.active === "Service"
     );
   }
 }
 async function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
-  const inactiveCombinations = loadCombinations.filter(combo => combo.active === "Inactive");
-  const loadCombinationValues = inactiveCombinations.map(combo => combo.loadCombination);
+  const inactiveCombinations = loadCombinations.filter(combo => combo?.active === "Inactive");
+  const loadCombinationValues = inactiveCombinations.map(combo => combo?.loadCombination);
   console.log("Inactive Load Combinations:", loadCombinationValues);
   if (strengthCombinations.length === 0) {
     console.error("No combinations with active set to 'Strength' found.");
@@ -1251,7 +1251,7 @@ console.log(joinedCombinations);
     ? match[1] // Use the value in parentheses (e.g., CB, ST, CS, CBC)
     : (() => {
         const matchingEntry = loadNames_key.find(entry => entry.name === comb.loadCaseName);
-        return matchingEntry ? matchingEntry.key : "ST"; // Use matching key if found, otherwise "ST"
+        return matchingEntry ? matchingEntry.key : "ST"; 
       })();
           return {
             "ANAL": analysisType,
@@ -2572,7 +2572,7 @@ for (let j = 0; j < 5; j++) {
         baseInnerArray = extractedValues_add[i][j][loopIndex]; 
       }} else {
         if ( loopCount === 1) { 
-          baseInnerArray = extractedValues_either[i][j]
+          baseInnerArray = extractedValues_either[i][j];
         } else {
           baseInnerArray = extractedValues_either[i][j][loopIndex]; 
         }
@@ -2708,13 +2708,10 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
           }
         }
       });
-      // if (addmultiResult.length > 0) {
-      //   addresult[factorIndex][i].push(addmultiResult);
-      // }
-      console.log(addmultiResult);
+      // console.log(addmultiResult);
       return addmultiResult; 
     }
-    console.log(finalResults);
+    // console.log(finalResults);
   }
 }
 console.log(addresult);
@@ -2733,7 +2730,7 @@ Object.keys(addresult).forEach((outerKey) => {
     });
   }
 });
-
+ 
 console.log("Updated addresult:", addresult);
 
 let allCombinations_multi = []; 
@@ -2763,12 +2760,19 @@ inputCombination.forEach((mainArray,mainIndex) => {
       ) {
         innerArray.forEach((subArray, index) => {
           const correspondingAddSubArray = addArray[key];
-          if (subArray && correspondingAddSubArray) {
+          if (
+            (Array.isArray(subArray) && correspondingAddSubArray) ||
+            (subArray.combinations.length > 0 && correspondingAddSubArray)
+          ) {
             const modifiedSubArray = backtrackAndJoin(correspondingAddSubArray);
             let combinedArray;
             modifiedSubArray.forEach((nestedArray) => {
               nestedArray.forEach((subSubArray) => {
-                combinedArray = [...subArray];
+                if (Array.isArray(subArray)) {
+                  combinedArray = [...subArray];
+              } else if (typeof subArray === "object" && subArray !== null && subArray.combinations) {
+                  combinedArray = [...subArray.combinations];
+              } 
                 combinedArray.push(...subSubArray);
                 combinedSet.push(combinedArray);
               });
@@ -3162,7 +3166,7 @@ function permutation_sign(result11) {
   console.log({ addObj, eitherArray, envelopeObj,firstKey });
   return { addObj, eitherArray,envelopeObj ,firstKey,secondLastKey};
 }
-
+  
 async function Generate_Load_Combination() {
   const cleanedLoadNames = all_loadCaseNames.map((name) =>
     name.replace(/\s*\((CB|ST|CS|CBC|MV|RS|CBR|CBSC|CBS)\)$/, '')
@@ -3329,7 +3333,7 @@ useEffect(() => {
 const removeDuplicateFactors = (data) => {
   return data.map((combination) => {
     // Only process loadCases if type is "Either"
-    if (combination.type === "Either" || combination.type === "Envelope") {
+    if (combination?.type === "Either" || combination?.type === "Envelope") {
       const updatedLoadCases = combination.loadCases.map((loadCase) => {
         const factors = [
           loadCase.factor1,
@@ -3356,7 +3360,8 @@ const removeDuplicateFactors = (data) => {
         ...combination,
         loadCases: updatedLoadCases,
       };
-    } else {
+    } 
+    if (combination?.type === "Add") {
       const updatedLoadCases = combination.loadCases.map((loadCase) => {
         const factors = [
           loadCase.factor1,
@@ -3615,7 +3620,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
     {selectedLoadCombinationIndex === index ? ( // Render input if this is the active row
       <input
         type="text"
-        value={combo.loadCombination}
+        value={combo?.loadCombination}
         onChange={(e) =>
           handleInputChange(index, 'loadCombination', e.target.value)
         }
@@ -3632,7 +3637,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
         onDoubleClick={() => handleLoadCombinationClick(index)} // Allow double-click to edit
         style={{ cursor: 'text' }}
       >
-        {combo.loadCombination || '---'} {/* Placeholder text if empty */}
+        {combo?.loadCombination || '---'} {/* Placeholder text if empty */}
       </Typography>
     )}
   </div>
@@ -3673,7 +3678,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                 toggleDropdown(index);
               }}
             >
-              <Typography>{combo.active}</Typography>
+              <Typography>{combo?.active}</Typography>
               {activeDropdownIndex === index && (
                 <div
                   style={{
@@ -3708,7 +3713,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                         toggleTypeDropdown(index);
                       }}
                     >
-                      <Typography>{combo.type}</Typography>
+                      <Typography>{combo?.type}</Typography>
                       {typeDropdownIndex === index && (
                         <div
                           style={{
@@ -3728,7 +3733,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                               style={{
                                 padding: '5px',
                                 cursor: 'pointer',
-                                backgroundColor: option === <Typography>combo.type</Typography> ? '#f0f0f0' : 'white'
+                                backgroundColor: option === <Typography>combo?.type</Typography> ? '#f0f0f0' : 'white'
                               }}
                             >
                               <Typography>{option}</Typography>
