@@ -9,14 +9,13 @@ import * as XLSX from 'xlsx';
 import { useSnackbar, SnackbarProvider } from "notistack";
 import { Panel } from '@midasit-dev/moaui';
 import { Typography } from '@midasit-dev/moaui';
-import ComponentsPanelTypographyDropList from './Components/ComponentsPanelTypographyDropList';
+import { ComponentsPanelTypographyDropList, ComponentsPanelTypographyDropList_sign } from './Components/ComponentsPanelTypographyDropList';
 import { Scrollbars } from '@midasit-dev/moaui';
 import ComponentsDialogHelpIconButton from './Components/ComponentsDialogHelpIconButton';
 import { midasAPI } from "./Function/Common";
 import { VerifyUtil, VerifyDialog } from "@midasit-dev/moaui";
 import ExcelJS from 'exceljs';  
 import { saveAs } from 'file-saver';
-import { last } from 'lodash';
 
 function App() {
 const [selectedLoadCombinationIndex, setSelectedLoadCombinationIndex] = useState(-1);
@@ -52,11 +51,24 @@ const { enqueueSnackbar } = useSnackbar();
   };
     
   const handleLoadCaseOptionSelect = (loadCombinationIndex, loadCaseIndex, selectedLoadCase) => {
+    if (
+      loadCombinationIndex === null || 
+      loadCaseIndex === null || 
+      !Array.isArray(loadCombinations) || 
+      !loadCombinations[loadCombinationIndex] || 
+      !Array.isArray(loadCombinations[loadCombinationIndex].loadCases) || 
+      !loadCombinations[loadCombinationIndex].loadCases[loadCaseIndex]
+    ) {
+      console.error("Invalid loadCombinationIndex or loadCaseIndex.");
+      return;
+    }
+  
     const updatedLoadCombinations = [...loadCombinations];
-    updatedLoadCombinations[loadCombinationIndex].loadCases[loadCaseIndex].loadCaseName = selectedLoadCase;
+    updatedLoadCombinations[loadCombinationIndex].loadCases[loadCaseIndex].loadCaseName = selectedLoadCase || null; // Allow null value
     setLoadCombinations(updatedLoadCombinations);
     setLoadCaseDropdownIndex(-1);
   };
+  
   const handleSignOptionSelect = (combinationIndex, caseIndex, sign) => {
     const updatedLoadCombinations = [...loadCombinations];
     updatedLoadCombinations[combinationIndex].loadCases[caseIndex].sign = sign;
@@ -269,14 +281,14 @@ const { enqueueSnackbar } = useSnackbar();
         }
         newLoadNames = newLoadNames.filter((name) => name !== undefined);
 
-        // Check if the cleaned newLoadNames is equal to loadNames
+        if (newLoadNames.length > 0 && loadNames.length > 0) {
         if (JSON.stringify(newLoadNames) === JSON.stringify(loadNames)) {
           enqueueSnackbar("Please define load cases", {
             variant: "error",
             anchorOrigin: { vertical: "top", horizontal: "center" },
           });
           return;
-        }
+        } }
           setLoadNames(newLoadNames);
           setLoadNames_key(newLoadCasesWithKeys);
         // } catch (error) {
@@ -408,12 +420,12 @@ function importLoadCombinationInput(data) {
 function getLoadCaseFactors(loadCaseName, combinations) {
   const cleanedLoadCaseName = loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|RS|CBR|CBSC|CBS)\)$/, '');
   for (const combo of combinations) {
-    if (cleanedLoadCaseName === combo.loadCombination) {
+    if (cleanedLoadCaseName === combo?.loadCombination) {
       return combo;
     }
   }
   return null;
-}
+}  
 function handleSignCases(sign, loadCase, factor) {  
   const result = [];
   if (sign === "+") {
@@ -475,8 +487,8 @@ else if (dimension > 2) {
     }
     result["Add"].push(loadCaseObj);
   } else {
-    const modifyName = getLoadCaseFactors(loadCases.loadCaseName, combinations);
-    const newLoadCases = combinations.find(combo => combo.loadCombination === modifyName.loadCombination);
+    const modifyName = getLoadCaseFactors(loadCases?.loadCaseName, combinations);
+    const newLoadCases = combinations.find(combo => combo?.loadCombination === modifyName?.loadCombination);
     if (newLoadCases && Array.isArray(newLoadCases.loadCases)) {
       if (newLoadCases.type === "Either") {
         result["Either"] = result["Either"] || [];
@@ -484,18 +496,32 @@ else if (dimension > 2) {
         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
           const tempArray = [];
           newLoadCases.loadCases.forEach(eitherLoadCase => {
-            const currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
+            let currentFactorValue;
+           if (eitherLoadCase.hasOwnProperty('factor')) {
+              currentFactorValue = eitherLoadCase.factor[0][factorIndex - 1];
+            } else {
+               currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
+            }
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
             const eitherLoadCaseName = eitherLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
             if (loadNames.includes(eitherLoadCaseName)) {
               if (factorIndex === 1) {
-                // Reinitialize factorArray for dynamic dimensions
                 factorArray = createNDimensionalArray(dimension);
                 for (let i = 1; i <= 5; i++) {
-                  const factorKey = `factor${i}`;
-                  let multipliedFactor = eitherLoadCase[factorKey] * value;
-                  multipliedFactor = eitherLoadCase[factorKey] !== undefined && eitherLoadCase[factorKey] !== "" ? eitherLoadCase[factorKey] * value : undefined;
+                  let factorKey;
+if (eitherLoadCase.hasOwnProperty('factor') && Array.isArray(eitherLoadCase.factor[0])) {
+    factorKey = eitherLoadCase.factor[0][i - 1];
+} else {
+    factorKey = `factor${i}`;
+}
+let multipliedFactor;
+if (typeof factorKey === "number") {
+    multipliedFactor = factorKey * value;
+} else {
+  multipliedFactor = eitherLoadCase[factorKey] !== undefined && eitherLoadCase[factorKey] !== "" ? eitherLoadCase[factorKey] * value : undefined;
+}
+
  // Handling dimension 1
  if (dimension === 1) {
   // In 1D array, we simply set the value at the first index
@@ -542,7 +568,7 @@ else if (dimension > 2) {
                 currentFactorValue * value,
                 factorIndex,
                 newSign,
-                dimension + 1,// Increment dimension for recursive calls
+                dimension + 1,
                 [...factorIndexArray, factorIndex]
               );
             }
@@ -556,7 +582,12 @@ else if (dimension > 2) {
         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
           let tempArray_add = [];
           newLoadCases.loadCases.forEach(addLoadCase => {
-            const currentFactorValue = addLoadCase[`factor${factorIndex}`];
+            let currentFactorValue;
+           if (addLoadCase.hasOwnProperty('factor')) {
+              currentFactorValue = addLoadCase.factor[0][factorIndex - 1];
+            } else {
+               currentFactorValue = addLoadCase[`factor${factorIndex}`];
+            }
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, addLoadCase.sign || '+');
             const addLoadCaseName = addLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
@@ -565,10 +596,19 @@ else if (dimension > 2) {
               if (factorIndex === 1) {
                 factorArray = createNDimensionalArray(dimension);
                 for (let i = 1; i <= 5; i++) {
-                  const factorKey = `factor${i}`;
-                  let multipliedFactor = addLoadCase[factorKey] * value;
-                  multipliedFactor = addLoadCase[factorKey] !== undefined && addLoadCase[factorKey] !== "" ? addLoadCase[factorKey] * value : undefined;
-                   // Handling dimension 1
+                  let factorKey;
+if (addLoadCase.hasOwnProperty('factor') && Array.isArray(addLoadCase.factor[0])) {
+    factorKey = addLoadCase.factor[0][i - 1];
+} else {
+    factorKey = `factor${i}`;
+}
+let multipliedFactor;
+if (typeof factorKey === "number") {
+    multipliedFactor = factorKey * value;
+} else {
+  multipliedFactor = addLoadCase[factorKey] !== undefined && addLoadCase[factorKey] !== "" ? addLoadCase[factorKey] * value : undefined;
+}
+
       if (dimension === 1) {
         // In 1D array, we simply set the value at the first index
         setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, [i - 1]);
@@ -578,18 +618,12 @@ else if (dimension > 2) {
         // In 2D array, set the value at the correct row and column (i-1, factor-1)
         setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, [i - 1, factor - 1]);
       }
-      // Handling dimensions greater than 2
       else if (dimension > 2) {
-        // Adjust for `n` dimensions
-        let previousFactorArray = [...factorIndexArray]; // Create a shallow copy of the array
-        previousFactorArray.pop(); // Remove the last value
-
-        // Fill `previousFactor` array based on dimension - 2
+        let previousFactorArray = [...factorIndexArray]; 
+        previousFactorArray.pop(); 
         let previousFactor = previousFactorArray.length > 0 
           ? previousFactorArray 
-          : [i - 1]; // If factorIndexArray is empty, use [i - 1] as default
-
-        // Create indices, adjusting for `n` dimensions
+          : [i - 1]; 
         const indices = [i - 1, factor - 1].concat(
           new Array(dimension - 2).fill(previousFactor[previousFactor.length - 1] -1)
         );
@@ -1032,6 +1066,7 @@ return { secondLastKey, firstKey, eitherArray, addObj , envelopeObj };
 
 function findStrengthCombinations(combinations) {
   if (values["Generate inactive load combinations in midas"]) {
+
   return combinations.filter(combo => 
     combo?.active === "Strength" || combo?.active === "Service" || combo?.active === "Inactive"
   );
@@ -1086,7 +1121,7 @@ async function generateBasicCombinations(loadCombinations) {
     combinationCounter =  combinationCounter + allFinalCombinations.length;
     allFinalCombinations = [];
     let addObj = [];
-    let eitherArray = [];
+    let eitherArray = [];     
     let envelopeObj = []; let new_combo = [];
     const comb_name = strengthCombination.loadCombination;
     const type = strengthCombination.type;
@@ -3179,7 +3214,7 @@ async function Generate_Load_Combination() {
     });
     return; 
   }
-  const uniqueFactorData = removeDuplicateFactors(loadCombinations);
+  let uniqueFactorData = removeDuplicateFactors(loadCombinations);
   setLoadCombinations(uniqueFactorData);
   console.log(uniqueFactorData);
   console.log(loadCombinations);
@@ -3261,6 +3296,24 @@ if (Object.keys(civilCom.Assign).length > 0 && !isGeneratingRef.current) {
   generateEnvelopeLoadCombination();
 }
 
+  let dropdownRef = useRef();
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        toggleSignDropdown(null); // Close the dropdown
+        toggleTypeDropdown(null);
+        toggleDropdown(null);
+        handleLoadCaseOptionSelect(null, 0, null);
+      }
+    };
+
+    document.addEventListener('click', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+    };
+  }, []);
 const toggleExcelReader = () => {
   fileInputRef.current.click();
 };
@@ -3330,9 +3383,8 @@ useEffect(() => {
     setInputValue('');
   }
 }, [loadCombinations]);
-const removeDuplicateFactors = (data) => {
+let removeDuplicateFactors = (data) => {
   return data.map((combination) => {
-    // Only process loadCases if type is "Either"
     if (combination?.type === "Either" || combination?.type === "Envelope") {
       const updatedLoadCases = combination.loadCases.map((loadCase) => {
         const factors = [
@@ -3342,11 +3394,7 @@ const removeDuplicateFactors = (data) => {
           loadCase.factor4,
           loadCase.factor5,
         ];
-
-        // Remove duplicates by creating a Set, then convert back to an array
         const uniqueFactors = Array.from(new Set(factors));
-
-        // Map unique factors back to loadCase properties
         return {
           ...loadCase,
           factor1: uniqueFactors[0] || undefined,
@@ -3580,7 +3628,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   };
   console.log(selectedLoadCombinationIndex);
   return (
-	<div className="App" >
+	<div className="App" style={{cursor : 'pointer'}}>
     {showDialog && <VerifyDialog />}
 		<GuideBox
 			padding={2}
@@ -3608,7 +3656,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
       marginBottom: '20px',
       marginTop:'2px',
       borderTop: '2px solid #ccc', // Adds a greyish line to the top border
-      boxShadow: '0px -4px 5px -4px grey' // Adds a shadow effect to the top border
+      boxShadow: '0px -4px 5px -4px grey',// Adds a shadow effect to the top border
     }}> 
     <Scrollbars height={360} width={280}>
 
@@ -3637,7 +3685,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
         onDoubleClick={() => handleLoadCombinationClick(index)} // Allow double-click to edit
         style={{ cursor: 'text' }}
       >
-        {combo?.loadCombination || '---'} {/* Placeholder text if empty */}
+        {combo?.loadCombination || '---'} 
       </Typography>
     )}
   </div>
@@ -3649,14 +3697,14 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
       color: 'black',
       cursor: 'pointer',
       display: 'flex',
-      justifyContent: 'center', // Ensure the icon is centered horizontally
-      alignItems: 'center', // Center the icon vertically
-      width: '10px', // Set the width of the delete button container
-      height: '20px', // Set the height of the delete button container
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      width: '10px', 
+      height: '20px', 
     }}
     onClick={(e) => {
       e.stopPropagation();
-      handleDelete(index); // Call delete function on click
+      handleDelete(index); 
     }}
   >
     <Typography style={{ color: 'red', fontSize: '12px' }}>🗑️</Typography>
@@ -3664,7 +3712,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   )}
 </div>
 
-        <div
+        <div 
               style={{
                 flex: '1 1 65px',
                 padding: '5px',
@@ -3681,6 +3729,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
               <Typography>{combo?.active}</Typography>
               {activeDropdownIndex === index && (
                 <div
+                ref={dropdownRef} 
                   style={{
                     position: 'absolute',
                     backgroundColor: 'white',
@@ -3691,7 +3740,6 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                     minWidth: '100%',
                   }}
                 >
-                  <div onClick={() => handleOptionSelect(index, 'Active')}><Typography>Active</Typography></div>
                   <div onClick={() => handleOptionSelect(index, 'Inactive')}><Typography>Inactive</Typography></div>
                   <div onClick={() => handleOptionSelect(index, 'Local')}><Typography>Local</Typography></div>
                   <div onClick={() => handleOptionSelect(index, 'Strength')}><Typography>Strength</Typography></div>
@@ -3701,6 +3749,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
             </div>
         {/* <div style={{ flex: '1 1 40px', padding: '5px', color: 'black' }}><Typography>{combo.type}</Typography></div> */}
         <div
+                      
                       style={{
                         flex: '1 1 50px',
                         padding: '5px',
@@ -3716,6 +3765,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                       <Typography>{combo?.type}</Typography>
                       {typeDropdownIndex === index && (
                         <div
+                        ref={dropdownRef}
                           style={{
                             position: 'absolute',
                             backgroundColor: 'white',
@@ -3763,7 +3813,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   <div style={{
   display: 'flex',
   alignItems: 'flex-end',
-  marginTop: '3px', // Adjust margin-bottom as per your requirement
+  marginTop: '3px', 
 }}><ComponentsDialogHelpIconButton /></div>
   </div>
       <div style={{ display: 'flex', flexDirection: 'row', backgroundColor: 'white', color: 'black',fontSize:'12px', height: '20px',borderTopLeftRadius: '10px', borderTopRightRadius: '10px'}}>
@@ -3803,17 +3853,17 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
         >
           <Typography>{loadCase.loadCaseName}</Typography>
           {loadCaseDropdownIndex === loadCaseIndex && (
-  <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
-    <Scrollbars height={150} width="100%"> {/* Applying the Scrollbars component */}
-      {/* <Stack spacing={1}> */}
-        {[
-          ...loadNames_key.map((item) => `${item.name}(${item.key})`), 
-           ...loadCombinations.map((combination) => combination.loadCombination)
-  ]
-  .filter((name, nameIndex) => nameIndex !== selectedLoadCombinationIndex) // Filter out the name at the current index
-  .map((name) => (
+  <div  style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0,cursor: 'pointer' }}>
+   <Scrollbars height={150} width="100%"> {/* Applying the Scrollbars component */}
+  {[
+    ...loadNames_key.map((item) => `${item.name}(${item.key})`),
+    ...loadCombinations.slice(0, selectedLoadCombinationIndex).map((combination) => 
+      `${combination.loadCombination}`
+    )
+  ].map((name) => (
     <div
-      key={name} // Using name as the key
+    ref={dropdownRef}
+      key={name} 
       onClick={() => handleLoadCaseOptionSelect(selectedLoadCombinationIndex, loadCaseIndex, name)}
       style={{
         padding: '5px',
@@ -3827,7 +3877,6 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
     </Scrollbars>
   </div>
 )}
-
         </div>
         <div
           style={{ flex: '1 1 25px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', position: 'relative' }}
@@ -3838,7 +3887,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
         >
           <Typography>{loadCase.sign}</Typography>
           {signDropdownIndex === loadCaseIndex && (
-            <div style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
+            <div ref={dropdownRef} style={{ position: 'absolute', backgroundColor: 'white', border: '1px solid #ccc', zIndex: 1, top: '100%', left: 0, right: 0 }}>
               {['+', '-', '+,-', '±'].map((signOption, signIndex) => (
                 <div
                   key={signIndex}
@@ -3850,6 +3899,10 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
               ))}
             </div>
           )}
+          {/* <ComponentsPanelTypographyDropList_sign
+          selectedValue={selectedDropListValue} 
+          onValueChange={handleSignOptionSelect} 
+        /> */}
         </div>
         {['factor1', 'factor2', 'factor3', 'factor4', 'factor5'].map((factorKey, factorIndex) => (
           <div
@@ -3865,8 +3918,9 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
       </div>
     ))}
     {/* {selectedLoadCombinationIndex >= 0 && ( */}
-    <div style={{ display: "flex", alignItems: "center" , width: "40%", marginLeft: "110px" }}>
+    <div style={{ display: "flex", alignItems: "center" , width: "55%", marginLeft: "110px" }}>
     {Buttons.NodeButton("contained", "Add Row", handleAddLoadCase)}
+    {/* <Seperator /> */}
     {Buttons.NodeButton("contained", "Delete Row", handleDeleteRow)}
     </div>
   {/* )} */}
