@@ -59,7 +59,7 @@ const { enqueueSnackbar } = useSnackbar();
       !Array.isArray(loadCombinations[loadCombinationIndex].loadCases) || 
       !loadCombinations[loadCombinationIndex].loadCases[loadCaseIndex]
     ) {
-      console.error("Invalid loadCombinationIndex or loadCaseIndex.");
+      // console.error("Invalid loadCombinationIndex or loadCaseIndex.");
       return;
     }
   
@@ -116,25 +116,69 @@ const { enqueueSnackbar } = useSnackbar();
       return updatedCombinations;
     });
   };
+let defaultLoadNames = [];
+let defaultLoadNamesKey = [];
+
+
+ let [loadNames, setLoadNames] = useState(defaultLoadNames);
+ let [loadNames_key, setLoadNames_key] = useState(defaultLoadNamesKey);
+ 
   
-    // Initialize loadNames with useState
-    let [loadNames, setLoadNames] = useState([
-      "Dead Load",
-      "Tendon Primary",
-      "Creep Primary",
-      "Shrinkage Primary",
-      "Tendon Secondary",
-      "Creep Secondary",
-      "Shrinkage Secondary",
-    ]);
-    let [loadNames_key, setLoadNames_key] = useState(
-      loadNames.map(name => ({ key: "CS", name }))
-    );
+    // useEffect(() => {
+    //   const fetchData = async () => {
+    //     try {
+    //       const stag = await midasAPI("GET", "/db/stag");
+          
+    //       if (stag && stag.hasOwnProperty("STAG")) {
+    //         const initialLoadNames = [
+    //           "Dead Load",
+    //           "Tendon Primary",
+    //           "Creep Primary",
+    //           "Shrinkage Primary",
+    //           "Tendon Secondary",
+    //           "Creep Secondary",
+    //           "Shrinkage Secondary",
+    //         ];
+  
+    //         setLoadNames(initialLoadNames);
+    //         setLoadNames_key(initialLoadNames.map(name => ({ key: "CS", name })));
+    //       } else {
+    //         setLoadNames([]);
+    //         setLoadNames_key([]);
+    //       }
+    //     } catch (error) {
+    //       console.error("Error fetching STAG data:", error);
+    //       setLoadNames([]);
+    //       setLoadNames_key([]);
+    //     }
+    //   };
+  
+    //   fetchData();
+    // }, []);
+  
   
     // Fetch load cases using useEffect
     useEffect(() => {
       (async function importLoadCases() {
+        const initializeLoadNames = async () => {
+          let stag = await midasAPI("GET", "/db/stag");
+        
+          if (stag && stag.hasOwnProperty("STAG")) {
+            defaultLoadNames = [
+              "Dead Load",
+              "Tendon Primary",
+              "Creep Primary",
+              "Shrinkage Primary",
+              "Tendon Secondary",
+              "Creep Secondary",
+              "Shrinkage Secondary",
+            ];
+            defaultLoadNamesKey = defaultLoadNames.map(name => ({ key: "CS", name }));
+          }
+        }; 
+        initializeLoadNames();
         let stct; let stldData; let smlc; let mvldid; let mvld; let mvldeu; let mvldch; let mvldbs; let mvldpl; let splc;
+          // stag = await midasAPI("GET","/db/stag");
           stct = await midasAPI("GET", "/db/stct");
           stldData = await midasAPI("GET", "/db/stld");
           smlc = await midasAPI("GET", "/db/smlc");
@@ -157,8 +201,8 @@ const { enqueueSnackbar } = useSnackbar();
                   })
             return;
            }
-          let newLoadNames = [...loadNames];
-          const newLoadCasesWithKeys = [...loadNames_key];
+          let newLoadNames = [...defaultLoadNames];
+          const newLoadCasesWithKeys = [...defaultLoadNamesKey];
           if (stct && stct.STCT) {
             for (const key in stct.STCT) {
               const item = stct.STCT[key];
@@ -281,7 +325,7 @@ const { enqueueSnackbar } = useSnackbar();
         }
         newLoadNames = newLoadNames.filter((name) => name !== undefined);
 
-        if (newLoadNames.length > 0 && loadNames.length > 0) {
+        if (!errorMessage) {
         if (JSON.stringify(newLoadNames) === JSON.stringify(loadNames)) {
           enqueueSnackbar("Please define load cases", {
             variant: "error",
@@ -1060,7 +1104,7 @@ console.log(addObj);
 eitherArray = multipleFactor(eitherArray);
 addObj = multipleFactor(addObj);
 envelopeObj = multipleFactor(envelopeObj);
-console.log({ firstKey, addObj, eitherArray, envelopeObj });
+console.log({ firstKey, addObj, eitherArray, envelopeObj });  
 return { secondLastKey, firstKey, eitherArray, addObj , envelopeObj };
 }
 
@@ -1078,7 +1122,27 @@ function findStrengthCombinations(combinations) {
 }
 async function generateBasicCombinations(loadCombinations) {
   const strengthCombinations = findStrengthCombinations(loadCombinations);
+  if (!strengthCombinations || strengthCombinations.length === 0) {
+    if (values["Generate inactive load combinations in midas"]) {
+    enqueueSnackbar("Please select at least one Load Combination of Strength/Service/Inactive Active type", {
+      variant: "error",
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+  } else {
+    enqueueSnackbar("Please select at least one Load Combination Strength/Service Active type", {
+      variant: "error",
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+  } return;
+  }
   const inactiveCombinations = loadCombinations.filter(combo => combo?.active === "Inactive");
+  // if (values["Generate inactive load combinations in midas"] && inactiveCombinations.length === 0) { 
+  //   enqueueSnackbar("Please select at least one Load Combination of Inactive Active type", {
+  //     variant: "error",
+  //     anchorOrigin: { vertical: "top", horizontal: "center" },
+  //   });
+  //   return;
+  // }
   const loadCombinationValues = inactiveCombinations.map(combo => combo?.loadCombination);
   console.log("Inactive Load Combinations:", loadCombinationValues);
   if (strengthCombinations.length === 0) {
@@ -2545,7 +2609,6 @@ console.log('Extracted Factors:add', extractedFactorsStore_add);
 console.log('Extracted Factors:either', extractedFactorsStore_either);
 console.log('All Combinations:', allCombinations);
 console.log('Number of Nested Arrays from First Inner Arrays:', nestedArrayCount);
-
 const extractedValues_either = Object.values(extractedFactorsStore_either);
 const extractedValues_add = Object.values(extractedFactorsStore_add);
 const mergeArray = [];
@@ -2568,8 +2631,7 @@ function getCustomCombinations(arrays,arrays_1) {
     if (currentIndex === 0) {
       filteredArrays[currentIndex].forEach((subArray, index) => {
         if (filteredArrays[currentIndex + 1] !== undefined) {
-          const nextSubArray =
-            filteredArrays[currentIndex + 1][filteredArrays[currentIndex + 1].length - 1 - index];
+          const nextSubArray = filteredArrays[currentIndex + 1][filteredArrays[currentIndex + 1].length - 1 - index];
           if (subArray.length > 0 && nextSubArray.length > 0) {
             if (arrays_1.flat(1).length === 1) {
               currentCombination.push(nextSubArray); 
@@ -2583,7 +2645,6 @@ function getCustomCombinations(arrays,arrays_1) {
         }
       });
     }
-    
   }
   buildCombination([], 0);
   filteredArrays.forEach(filteredArray => {
@@ -2591,11 +2652,10 @@ function getCustomCombinations(arrays,arrays_1) {
       result.push(filteredArray);
     }
   });
-
   return result;
 }
 let loopCount = nestedArrayCount > 0 ? nestedArrayCount : 1;
-for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
+for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {      
   let iterationArray = [];
 for (let j = 0; j < 5; j++) {
   for (let i = 0; i < 5; i++) {
@@ -2664,7 +2724,6 @@ console.log(mergeArray);
           }
         } else {
         }
-      
         return finalCombinations;
       }
       let combinedResult  = [];
@@ -2691,7 +2750,6 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
       if (Array.isArray(addArray) && addArray.length > 0) {
         addArray.forEach(item => {
           let itemResults = [];
-    
           if (Array.isArray(item)) {
             item.forEach(subItem => {
               const processedSubItem = processItem(subItem);
@@ -2722,7 +2780,6 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
             if (factor !== undefined && factor !== null) {
               factorValue = getSingleFactor(factor, factorIndex, i);
             }
-    
             if (factorValue !== undefined && factorValue !== null) {
               addmultiResult.push({ loadCaseName, sign, factor: factorValue });
             }
@@ -2775,9 +2832,9 @@ inputCombination.forEach((mainArray,mainIndex) => {
   mainArray.forEach((innerArray, innerIndex) => { 
     let combinedSet = [];
     Object.keys(addresult).forEach((key) => {
-      if (Number(key) === mainIndex) {
-        return;
-      }
+      // if (Number(key) === mainIndex) {
+      //   return;
+      // }
       const addArray = addresult[key];
       if (
         typeof addArray === 'object' &&
@@ -3304,7 +3361,7 @@ if (Object.keys(civilCom.Assign).length > 0 && !isGeneratingRef.current) {
         toggleSignDropdown(null); // Close the dropdown
         toggleTypeDropdown(null);
         toggleDropdown(null);
-        handleLoadCaseOptionSelect(null, 0, null);
+        // handleLoadCaseOptionSelect(null, 0, null);
       }
     };
 
