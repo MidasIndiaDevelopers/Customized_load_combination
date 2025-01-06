@@ -1108,9 +1108,18 @@ console.log({ firstKey, addObj, eitherArray, envelopeObj });
 return { secondLastKey, firstKey, eitherArray, addObj , envelopeObj };
 }
 
-function findStrengthCombinations(combinations) {
+function findStrengthCombinations(combinations,filteredCombinations) {
+  if (filteredCombinations) {
+    const indexOfFilteredCombination = combinations.findIndex((combo) =>
+      filteredCombinations.includes(combo)
+    );
+    if (indexOfFilteredCombination !== -1) {
+      return combinations.slice(0, indexOfFilteredCombination);
+    }
+    return combinations;
+  }
+  
   if (values["Generate inactive load combinations in midas"]) {
-
   return combinations.filter(combo => 
     combo?.active === "Strength" || combo?.active === "Service" || combo?.active === "Inactive"
   );
@@ -1121,7 +1130,12 @@ function findStrengthCombinations(combinations) {
   }
 }
 async function generateBasicCombinations(loadCombinations) {
-  const strengthCombinations = findStrengthCombinations(loadCombinations);
+  const filteredCombinations = loadCombinations.filter(
+    (comb) =>
+      (comb.active === "Service" || comb.active === "Strength" || comb.active === "Inactive") &&
+      comb.type === "Envelope"
+  );  
+  const strengthCombinations = findStrengthCombinations(loadCombinations,filteredCombinations);
   if (!strengthCombinations || strengthCombinations.length === 0) {
     if (values["Generate inactive load combinations in midas"]) {
     enqueueSnackbar("Please select at least one Load Combination of Strength/Service/Inactive Active type", {
@@ -1179,7 +1193,7 @@ async function generateBasicCombinations(loadCombinations) {
     initial_lc = Object.keys(load_combo[check]).length;
   } 
   let allFinalCombinations = [];
-  let combinationCounter = 0; 
+  let combinationCounter = 0;   
   let last_value;   let backupCivilCom = { Assign: {} };
   for (const strengthCombination of strengthCombinations) {
     combinationCounter =  combinationCounter + allFinalCombinations.length;
@@ -1198,7 +1212,7 @@ async function generateBasicCombinations(loadCombinations) {
       const factors = [];
       for (let factor = 1; factor <= 5; factor++) {
         const factorKey = `factor${factor}`;
-        if (factorKey in loadCase) {
+        if (factorKey in loadCase) {      
           const factorValue = loadCase[factorKey];
           factors.push({ factor, value: factorValue });
         } else {
@@ -1215,7 +1229,6 @@ async function generateBasicCombinations(loadCombinations) {
       console.log(factors);
       const factorObject = factors.find(f => f.factor === factor);
       if (factorObject && factorObject.value !== undefined  && factorObject.value !== "") {
-      
       const loadCaseName = loadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
       if (factor === 1) {
         if (loadNames.includes(loadCaseName)) {
@@ -1237,9 +1250,8 @@ async function generateBasicCombinations(loadCombinations) {
         }
         loadCase['factor'] = undefined;
         loadCase.factor = uniqueFactors;
-        new_combo.push(loadCase)
+        new_combo.push(loadCase);
       }
-      
       } 
       if ((!loadNames.includes(loadCaseName))) {
           const sign = loadCase.sign || '+';
@@ -1297,12 +1309,11 @@ console.log(joinedCombinations);
       joinedComb = []
       } 
     }
-   
       allFinalCombinations.forEach((combArray, idx) => {
         const combinationName = `${comb_name}_${idx + 1}`;
+        const active = loadCombinationValues.includes(comb_name) ? "INACTIVE" : "ACTIVE";
         let vCOMB = combArray.map((comb) => {
-          // console.log('comb', comb);
-          const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');;
+          const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
           const match = comb.loadCaseName.match(/\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/);
           const analysisType = match
     ? match[1] 
@@ -1319,7 +1330,7 @@ console.log(joinedCombinations);
         // console.log(`vCOMB for combination ${combinationName}:`, vCOMB);
         backupCivilCom.Assign[`${idx + 1 + combinationCounter + initial_lc}`] = {
           "NAME": combinationName,
-          "ACTIVE": "ACTIVE",
+          "ACTIVE": active,
           "bCB": false,
           "iTYPE": 0,
           "vCOMB": vCOMB
@@ -1334,17 +1345,14 @@ console.log(joinedCombinations);
       concatenatedArray.forEach((combArray) => {
         combArray.forEach(subArray => allFinalCombinations.push(subArray));
       });
-    
-      // Now, iterate over allFinalCombinations to create and set vCOMB for each combination
       allFinalCombinations.forEach((combArray, idx) => {
         combinationCounter++;
         const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
         // Prepare the vCOMB structure for this combination
         let vCOMB = combArray.map((comb) => {
-          const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');;
+          const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
           // Extract the value inside the parentheses if present
   const match = comb.loadCaseName.match(/\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/);
-
   // Use the value from parentheses if present, otherwise derive from loadNames_key
   const analysisType = match
     ? match[1] // Use the value in parentheses (e.g., CB, ST, CS, CBC)
@@ -1371,7 +1379,6 @@ console.log(joinedCombinations);
     }
     if (values["Generate envelop load combinations in midas"]) {
       console.log("Generating envelope load combinations...");
-    
       const combinationName = `${comb_name}_Env`;
       let allVCombEntries = [];
       for (const key in backupCivilCom.Assign) {
@@ -1427,10 +1434,8 @@ function join_factor(finalCombinations_sign) {
     if (Array.isArray(arr)) {
       return arr.reduce((flat, item) => {
         if (Array.isArray(item)) {
-          // If the item is an array, flatten it individually
           return flat.concat(deepFlatten(item));
         } else {
-          // Otherwise, just add the item
           return flat.concat(item);
         }
       }, []);
@@ -1442,14 +1447,11 @@ function join_factor(finalCombinations_sign) {
     if (Array.isArray(source)) {
       for (let i = 0; i < source.length; i++) {
         if (Array.isArray(source[i])) {
-          // Ensure the target array exists and is initialized at this depth
           if (!target[i]) {
             target[i] = [];
           }
-          // Recursively merge deeper dimensions
           mergeFactors(target[i], source[i]);
         } else {
-          // At the deepest level, copy non-undefined values from the source
           if (source[i] !== undefined) {
             target[i] = source[i] !== undefined ? source[i] : target[i];
           }
@@ -2662,7 +2664,7 @@ for (let j = 0; j < 5; j++) {
       let baseInnerArray;
       if (type == "add"){
       if ( loopCount === 1) { 
-        baseInnerArray = extractedValues_add[i][j]
+        baseInnerArray = extractedValues_add[i][j];
       } else {
         baseInnerArray = extractedValues_add[i][j][loopIndex]; 
       }} else {
@@ -2832,9 +2834,9 @@ inputCombination.forEach((mainArray,mainIndex) => {
   mainArray.forEach((innerArray, innerIndex) => { 
     let combinedSet = [];
     Object.keys(addresult).forEach((key) => {
-      // if (Number(key) === mainIndex) {
-      //   return;
-      // }
+      if (Number(key) === mainIndex) {
+        return;
+      }
       const addArray = addresult[key];
       if (
         typeof addArray === 'object' &&
