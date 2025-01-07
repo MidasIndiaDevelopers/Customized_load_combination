@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import { useSnackbar, SnackbarProvider } from "notistack";
 import { Panel } from '@midasit-dev/moaui';
 import { Typography } from '@midasit-dev/moaui';
-import { ComponentsPanelTypographyDropList, ComponentsPanelTypographyDropList_sign } from './Components/ComponentsPanelTypographyDropList';
+import { ComponentsPanelTypographyDropList} from './Components/ComponentsPanelTypographyDropList';
 import { Scrollbars } from '@midasit-dev/moaui';
 import ComponentsDialogHelpIconButton from './Components/ComponentsDialogHelpIconButton';
 import { midasAPI } from "./Function/Common";
@@ -33,6 +33,7 @@ const addLoadCaseTimeout = useRef(null);
 const [civilComEnv, setCivilComeEnv] = useState({ "Assign": {} });
 // let [loadNames, setLoadNames] = useState(null);
 const [civilCom, setCivilCom] = useState({ "Assign": {} });
+const [civilComEnvValues, setCivilComEnvValues] = useState({ "Assign": {} });
 const [values, setValues] = useState({
   "Generate envelop load combinations in midas": false,
   "Generate inactive load combinations in midas": false,
@@ -496,8 +497,12 @@ function createCombinations(type,loadCases, strengthCombination, combinations, l
   if (loadNames.includes(cleanedLoadCaseName) || 
   (type === "Envelope" && getLoadCaseFactors(loadCases.loadCaseName, combinations)?.type === "Add")) {
     for (let i = 1; i <= 5; i++) {
-      const factorKey = `factor${i}`;
-      let multipliedFactor = loadCases[factorKey] * value;
+      const factorKey = `factor${i}`; let multipliedFactor;
+      if (dimension === 1) {
+         multipliedFactor = loadCases[factorKey];
+      } else {
+         multipliedFactor = loadCases[factorKey] * value;
+      }
       if (i === factor) {
         multipliedFactor = loadCases[factorKey] !== undefined && loadCases[factorKey] !== "" ? loadCases[factorKey] * value : 1;
       }
@@ -657,7 +662,6 @@ if (typeof factorKey === "number") {
         // In 1D array, we simply set the value at the first index
         setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, [i - 1]);
       }
-      // Handling dimension 2
       else if (dimension === 2) {
         // In 2D array, set the value at the correct row and column (i-1, factor-1)
         setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, [i - 1, factor - 1]);
@@ -706,17 +710,30 @@ if (typeof factorKey === "number") {
         for (let factorIndex = 1; factorIndex <= 5; factorIndex++) {
           let tempArray_envelope = [];
           newLoadCases.loadCases.forEach(envelopeLoadCase => {
-            const currentFactorValue = envelopeLoadCase[`factor${factorIndex}`];
-            if (currentFactorValue === undefined) return;
+            let currentFactorValue;
+            if (envelopeLoadCase.hasOwnProperty('factor')) {
+               currentFactorValue = envelopeLoadCase.factor[0][factorIndex - 1];
+             } else {
+                currentFactorValue = envelopeLoadCase[`factor${factorIndex}`];
+             }
+             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, envelopeLoadCase.sign || '+');
             if (loadNames.includes(envelopeLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, ''))) {
               if (factorIndex === 1) {
                 factorArray = createNDimensionalArray(dimension);
                 for (let i = 1; i <= 5; i++) {
-                  const factorKey = `factor${i}`;
-                  let multipliedFactor = envelopeLoadCase[factorKey] * value;
-                  multipliedFactor = envelopeLoadCase[factorKey] !== undefined && envelopeLoadCase[factorKey] !== "" ? envelopeLoadCase[factorKey] * value : undefined;
-
+                  let factorKey;
+                  if (envelopeLoadCase.hasOwnProperty('factor') && Array.isArray(envelopeLoadCase.factor[0])) {
+                      factorKey = envelopeLoadCase.factor[0][i - 1];
+                  } else {
+                      factorKey = `factor${i}`;
+                  }
+                  let multipliedFactor;
+                  if (typeof factorKey === "number") {
+                      multipliedFactor = factorKey * value;
+                  } else {
+                    multipliedFactor = envelopeLoadCase[factorKey] !== undefined && envelopeLoadCase[factorKey] !== "" ? envelopeLoadCase[factorKey] * value : undefined;
+                  }
                   if (dimension === 1) {
                     setFactorArrayValue(factorArray, multipliedFactor, 1, dimension, [i - 1]);
                   } else if (dimension === 2) {
@@ -1108,34 +1125,71 @@ console.log({ firstKey, addObj, eitherArray, envelopeObj });
 return { secondLastKey, firstKey, eitherArray, addObj , envelopeObj };
 }
 
-function findStrengthCombinations(combinations,filteredCombinations) {
-  if (filteredCombinations) {
-    const indexOfFilteredCombination = combinations.findIndex((combo) =>
-      filteredCombinations.includes(combo)
-    );
-    if (indexOfFilteredCombination !== -1) {
-      return combinations.slice(0, indexOfFilteredCombination);
-    }
-    return combinations;
+function findStrengthCombinations(combinations, filteredCombinations) {
+  let strengthCombinations = [];
+  if (filteredCombinations.length > 0) {
+    filteredCombinations.forEach((filteredObj) => {
+      let new_combo = [];
+      combinations.forEach((combo) => {
+        if (
+          combo.active === filteredObj.active &&
+          combo.loadCombination === filteredObj.loadCombination &&
+          combo.type === filteredObj.type &&
+          filteredObj.loadCases.every((filteredLoadCase, i) => 
+            filteredLoadCase.loadCaseName === combo.loadCases[i].loadCaseName &&
+            filteredLoadCase.sign === combo.loadCases[i].sign &&
+            filteredLoadCase.factor1 === combo.loadCases[i].factor1 &&
+            filteredLoadCase.factor2 === combo.loadCases[i].factor2 &&
+            filteredLoadCase.factor3 === combo.loadCases[i].factor3 &&
+            filteredLoadCase.factor4 === combo.loadCases[i].factor4 &&
+            filteredLoadCase.factor5 === combo.loadCases[i].factor5 
+          )
+        ) {
+          new_combo.push(combo);
+        }
+      });
+      const indexOfFilteredCombination = combinations.findIndex((combo) =>
+        new_combo.includes(combo)
+      );
+      if (indexOfFilteredCombination !== -1) {
+        combinations.slice(0, indexOfFilteredCombination).forEach((combo) => {
+          strengthCombinations.push(combo); 
+        });
+      }
+    });
   }
-  
   if (values["Generate inactive load combinations in midas"]) {
-  return combinations.filter(combo => 
-    combo?.active === "Strength" || combo?.active === "Service" || combo?.active === "Inactive"
-  );
-  }else {
-    return combinations.filter(combo => 
+    combinations.filter(combo => 
+      combo?.active === "Strength" || combo?.active === "Service" || combo?.active === "Inactive"
+    ).forEach((combo) => {
+      strengthCombinations.push(combo); // Push each filtered combo
+    });
+  } else {
+    combinations.filter(combo => 
       combo?.active === "Strength" || combo?.active === "Service"
-    );
+    ).forEach((combo) => {
+      strengthCombinations.push(combo); // Push each filtered combo
+    });
   }
+  return strengthCombinations; 
 }
+
 async function generateBasicCombinations(loadCombinations) {
   const filteredCombinations = loadCombinations.filter(
     (comb) =>
       (comb.active === "Service" || comb.active === "Strength" || comb.active === "Inactive") &&
       comb.type === "Envelope"
   );  
-  const strengthCombinations = findStrengthCombinations(loadCombinations,filteredCombinations);
+  let strengthCombinations = findStrengthCombinations(loadCombinations,filteredCombinations);
+  strengthCombinations = [...strengthCombinations, ...filteredCombinations];
+  strengthCombinations = strengthCombinations.filter((value, index, self) =>
+    index === self.findIndex(t => 
+      t.loadCombination === value.loadCombination && 
+      t.active === value.active && 
+      t.type === value.type && 
+      JSON.stringify(t.loadCases) === JSON.stringify(value.loadCases)
+    )
+  );
   if (!strengthCombinations || strengthCombinations.length === 0) {
     if (values["Generate inactive load combinations in midas"]) {
     enqueueSnackbar("Please select at least one Load Combination of Strength/Service/Inactive Active type", {
@@ -1194,13 +1248,11 @@ async function generateBasicCombinations(loadCombinations) {
   } 
   let allFinalCombinations = [];
   let combinationCounter = 0;   
-  let last_value;   let backupCivilCom = { Assign: {} };
+  let last_value;   let backupCivilCom = { Assign: {} }; let backupCivilComev = { Assign: {} };
   for (const strengthCombination of strengthCombinations) {
     combinationCounter =  combinationCounter + allFinalCombinations.length;
     allFinalCombinations = [];
-    let addObj = [];
-    let eitherArray = [];     
-    let envelopeObj = []; let new_combo = [];
+    let new_combo = [];
     const comb_name = strengthCombination.loadCombination;
     const type = strengthCombination.type;
     const factorArray = [];
@@ -1345,10 +1397,50 @@ console.log(joinedCombinations);
       concatenatedArray.forEach((combArray) => {
         combArray.forEach(subArray => allFinalCombinations.push(subArray));
       });
+      if (type === "Envelope") {
+        const manipulatedCombinations = [];
+        let endpoint = '';
+        switch (selectedDropListValue) {
+          case 1:
+            endpoint = 'CBS';
+            break;
+          case 2:
+            endpoint = 'CBC';
+            break;
+          case 3:
+            endpoint = 'CBR';
+            break;
+          case 4:
+            endpoint = 'CBSC';
+            break;
+        }
+      
+        allFinalCombinations.forEach((combArray) => {
+          combArray.forEach((comb) => {
+            const loadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
+            const occurrences = [
+              ...Object.values(backupCivilCom.Assign),
+              ...Object.values(backupCivilComev.Assign)
+            ].filter(
+              (assign) => assign.NAME.replace(/_\d+$/, "") === loadCaseName
+            ).length;
+            if (occurrences > 0) {
+            for (let i = 0; i < Math.max(occurrences, 1); i++) {
+              const updatedComb = { ...comb, loadCaseName: `${loadCaseName}_${i + 1} (${endpoint})` };
+              manipulatedCombinations.push([updatedComb]);
+            }
+          } else {
+            manipulatedCombinations.push([comb]);
+          }
+          });
+        });
+        if (manipulatedCombinations.length > 0) {
+        allFinalCombinations = manipulatedCombinations;
+        }
+      }
       allFinalCombinations.forEach((combArray, idx) => {
         combinationCounter++;
-        const combinationName = `${comb_name}_${idx + 1}`; // comb_name_arraynumber
-        // Prepare the vCOMB structure for this combination
+        const combinationName = `${comb_name}_${idx + 1}`; 
         let vCOMB = combArray.map((comb) => {
           const cleanedLoadCaseName = comb.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
           // Extract the value inside the parentheses if present
@@ -1366,6 +1458,15 @@ console.log(joinedCombinations);
             "FACTOR": (comb.sign === "+" ? 1 : -1) * comb.factor 
           };
         });
+        if (type === "Envelope") {
+        backupCivilComev.Assign[`${idx + 1 + combinationCounter + initial_lc}`] = {
+          "NAME": combinationName,
+          "ACTIVE": "ACTIVE",
+          "bCB": false,
+          "iTYPE": 0,
+          "vCOMB": vCOMB
+      };
+    } else{
         backupCivilCom.Assign[`${idx + 1 + combinationCounter + initial_lc}`] = {
           "NAME": combinationName,
           "ACTIVE": "ACTIVE",
@@ -1373,7 +1474,9 @@ console.log(joinedCombinations);
           "iTYPE": 0,
           "vCOMB": vCOMB
       };
+    }
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
+      setCivilComEnvValues({ Assign: { ...backupCivilComev.Assign } });
       last_value = idx + 1 + combinationCounter + initial_lc;
       });
     }
@@ -1426,6 +1529,7 @@ console.log(joinedCombinations);
   console.log( "allcomb",allFinalCombinations);
   return allFinalCombinations;
 }
+console.log("env", civilComEnvValues);
 console.log("Civil",civilCom);
 console.log("Civil_env",civilComEnv);
 
@@ -3149,11 +3253,11 @@ function permutation_sign(result11) {
           }
         }
         if (temp.length === 0) {
-          innerArr.splice(objIndex, 1); // Remove the empty obj from innerArr
-          objIndex--; // Adjust the index after removal to avoid skipping elements
+          innerArr.splice(objIndex, 1); 
+          objIndex--; 
         } else {
           obj.length = 0;
-          obj.push(...temp); // Push modified combinations to obj
+          obj.push(...temp);
         }
       }
     }
@@ -3273,8 +3377,10 @@ async function Generate_Load_Combination() {
     });
     return; 
   }
+  console.log(loadCombinations);
   let uniqueFactorData = removeDuplicateFactors(loadCombinations);
-  setLoadCombinations(uniqueFactorData);
+  setLoadCombinations(uniqueFactorData.filter((i)=>(i)));
+  console.log(uniqueFactorData.filter((i)=>(i)))
   console.log(uniqueFactorData);
   console.log(loadCombinations);
   const basicCombinations = generateBasicCombinations(loadCombinations);
@@ -3325,6 +3431,8 @@ async function generateEnvelopeLoadCombination() {
       const response_env = await midasAPI("PUT", endpoint, civilComEnv);
       console.log(response_env);
     }
+    const response_env = await midasAPI("PUT", endpoint, civilComEnvValues);
+    console.log(response_env);
     if (response && response[check]) {
       enqueueSnackbar("Load-Combination Generated Successfully", {
         variant: "success",
@@ -3346,8 +3454,10 @@ async function generateEnvelopeLoadCombination() {
     isGeneratingRef.current = false; 
     civilCom.Assign = {};
     civilComEnv.Assign = {};
+    civilComEnvValues.Assign = {};
     console.log("civilCom has been refreshed:", civilCom);
     console.log("civilComEnv has been refreshed:", civilComEnv);
+    console.log("civilComEnvValues has been refreshed:", civilComEnvValues);
   }
 }
 
@@ -3356,19 +3466,15 @@ if (Object.keys(civilCom.Assign).length > 0 && !isGeneratingRef.current) {
 }
 
   let dropdownRef = useRef();
-
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        toggleSignDropdown(null); // Close the dropdown
+        toggleSignDropdown(null); 
         toggleTypeDropdown(null);
         toggleDropdown(null);
-        // handleLoadCaseOptionSelect(null, 0, null);
       }
     };
-
     document.addEventListener('click', handleOutsideClick);
-
     return () => {
       document.removeEventListener('click', handleOutsideClick);
     };
