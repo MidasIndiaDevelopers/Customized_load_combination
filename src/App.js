@@ -504,7 +504,7 @@ function createCombinations(type,loadCases, strengthCombination, combinations, l
          multipliedFactor = loadCases[factorKey] * value;
       }
       if (i === factor) {
-        multipliedFactor = loadCases[factorKey] !== undefined && loadCases[factorKey] !== "" ? loadCases[factorKey] * value : 1;
+        multipliedFactor = loadCases[factorKey] !== undefined && loadCases[factorKey] !== "" ? multipliedFactor : 1;
       }
  if (dimension === 1) {
   // In 1D array, we simply set the value at the first index
@@ -1246,11 +1246,11 @@ async function generateBasicCombinations(loadCombinations) {
   if(load_combo && load_combo[check] && !load_combo[check].hasOwnProperty('message')){
     initial_lc = Object.keys(load_combo[check]).length;
   } 
-  let allFinalCombinations = [];
-  let combinationCounter = 0;   
-  let last_value;   let backupCivilCom = { Assign: {} }; let backupCivilComev = { Assign: {} };
+  let allFinalCombinations = []; let allEnv = [];
+  let combinationCounter = 0;   let env_count = 0;
+  let last_value;   let backupCivilCom = { Assign: {} }; let backupCivilComev = { Assign: {} }; let backupCivilCom_env = { Assign: {} };
   for (const strengthCombination of strengthCombinations) {
-    combinationCounter =  combinationCounter + allFinalCombinations.length;
+    combinationCounter =  combinationCounter + allFinalCombinations.length + env_count;
     allFinalCombinations = [];
     let new_combo = [];
     const comb_name = strengthCombination.loadCombination;
@@ -1388,7 +1388,7 @@ console.log(joinedCombinations);
           "vCOMB": vCOMB
       };
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
-      last_value = idx + 1 + combinationCounter;
+      last_value = idx + 1 + combinationCounter ;
       });
   }
     if (type === "Either" || type === "Envelope") {
@@ -1477,17 +1477,19 @@ console.log(joinedCombinations);
     }
       setCivilCom({ Assign: { ...backupCivilCom.Assign } });
       setCivilComEnvValues({ Assign: { ...backupCivilComev.Assign } });
-      last_value = idx + 1 + combinationCounter + initial_lc;
+      last_value = idx + 1 + combinationCounter;
       });
     }
     if (values["Generate envelop load combinations in midas"]) {
+      env_count = env_count + 1;
       console.log("Generating envelope load combinations...");
       const combinationName = `${comb_name}_Env`;
       let allVCombEntries = [];
       for (const key in backupCivilCom.Assign) {
         // allVCombEntries = []
-        const assignEntry = backupCivilCom.Assign[key];
-        if (assignEntry) {
+        let assignEntry = backupCivilCom.Assign[key];
+       
+        if (assignEntry && !allEnv.includes(assignEntry)) {
           let endpoint = '';
           let check = '';
           switch (selectedDropListValue) {
@@ -1512,19 +1514,28 @@ console.log(joinedCombinations);
           };
           allVCombEntries.push(vCombObject);
         }
+        allEnv.push(assignEntry);
       }
-      setCivilComeEnv(prevState => {
-        let newAssign = { ...prevState.Assign };
-        newAssign[`${last_value + 1}`] = {
-          "NAME": combinationName,
-          "ACTIVE": "STRENGTH",
-          "bCB": true,
-          "iTYPE": 1,
-          "vCOMB": allVCombEntries
-        };
-        return { ...prevState, Assign: newAssign };
-      });
+      backupCivilCom_env.Assign[`${last_value + 1}`] = {
+        "NAME": combinationName,
+        "ACTIVE": "STRENGTH",
+        "bCB": false,
+        "iTYPE": 0,
+        "vCOMB": allVCombEntries
+    };
+      // setCivilComeEnv(prevState => {
+      //   let newAssign = { ...prevState.Assign };
+      //   newAssign[`${last_value + 1}`] = {
+      //     "NAME": combinationName,
+      //     "ACTIVE": "STRENGTH",
+      //     "bCB": true,
+      //     "iTYPE": 1,
+      //     "vCOMB": allVCombEntries
+      //   };
+      //   return { ...prevState, Assign: newAssign };
+      // });
     } 
+    setCivilComeEnv({ Assign: { ...backupCivilCom_env.Assign } });
   }
   console.log( "allcomb",allFinalCombinations);
   return allFinalCombinations;
@@ -2107,10 +2118,10 @@ function join(factorCombinations) {
     else {
       const { loadCaseName, sign, factor } = factorObj[key];
       let factorValue;
-      if (factor !== undefined && factor !== null) {
+      if (factor !== undefined && factor !== null && factor !== "") {
         factorValue = getSingleFactor(factor, factorIndex, i);
       }
-      if (factorValue !== undefined && factorValue !== 0 && factorValue !== null) {
+      if (factorValue !== undefined && factorValue !== 0 && factorValue !== null && factorValue !== "") {
         extractedFactors.push({ loadCaseName, sign, factor: factorValue });
       }
     }
@@ -2565,10 +2576,10 @@ if (allComb.length > 0) {
                       const sign = nestedValue.sign;
                       const factor = nestedValue.factor;
                       let factorValue;
-                      if (factor !== undefined) {
+                      if (factor !== undefined && factor !== "") {
                         factorValue = getSingleFactor(factor, factorIndex, i);
                       }
-                      if (factorValue !== undefined && factorValue !== null) {
+                      if (factorValue !== undefined && factorValue !== null && factorValue !== 0 && factor !== "") {
                         combinedResult.push({ loadCaseName, sign, factor: factorValue });
                       }
                     });
@@ -2577,14 +2588,14 @@ if (allComb.length > 0) {
                     const loadCaseName = value.loadCaseName;
                     const sign = value.sign;
                     let factor;
-                  if (value.factor !== undefined && value.factor !== null) {
+                  if (value.factor !== undefined && value.factor !== null && value.factor !== 0) {
                     factor = value.factor;
                   }
                     let factorValue;
-                    if (factor !== undefined) {
+                    if (factor !== undefined && factor !== "") {
                       factorValue = getSingleFactor(factor, factorIndex, i);
                     }
-                    if (factorValue !== undefined && factorValue !== null) {
+                    if (factorValue !== undefined && factorValue !== null && factorValue !== 0 && factor !== "") {
                       combinedResult.push({ loadCaseName, sign, factor: factorValue });
                     }
                   }
@@ -2599,14 +2610,14 @@ if (allComb.length > 0) {
                     const loadCaseName = nestedValue.loadCaseName;
                     const sign = nestedValue.sign;
                     let factor;
-                  if (nestedValue.factor !== undefined && nestedValue.factor !== null) {
+                  if (nestedValue.factor !== undefined && nestedValue.factor !== null && nestedValue.factor !== 0) {
                     factor = nestedValue.factor;
                   }
                     let factorValue;
-                    if (factor !== undefined) {
+                    if (factor !== undefined && factor !== "") {
                       factorValue = getSingleFactor(factor, factorIndex, i);
                     }
-                    if (factorValue !== undefined && factorValue !== null) {
+                    if (factorValue !== undefined && factorValue !== null && factorValue !== 0 && factor !== "") {
                       combinedResult.push({ loadCaseName, sign, factor: factorValue });
                     }
                   });
@@ -2615,14 +2626,14 @@ if (allComb.length > 0) {
                   const loadCaseName = value.loadCaseName;
                   const sign = value.sign;
                   let factor;
-                  if (value.factor !== undefined && value.factor !== null) {
+                  if (value.factor !== undefined && value.factor !== null && value.factor !== 0) {
                     factor = value.factor;
                   }
                   let factorValue;
-                  if (factor !== undefined) {
+                  if (factor !== undefined && factor !== "") {
                     factorValue = getSingleFactor(factor, factorIndex, i);
                   }
-                  if (factorValue !== undefined && factorValue !== null) {
+                  if (factorValue !== undefined && factorValue !== null && factorValue !== 0 && factor !== "") {
                     combinedResult.push({ loadCaseName, sign, factor: factorValue });
                   }
                 }
@@ -2883,10 +2894,10 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
             const sign = nestedValue.sign;
             const factor = nestedValue.factor;
             let factorValue;
-            if (factor !== undefined && factor !== null) {
+            if (factor !== undefined && factor !== null && factor !== '') {
               factorValue = getSingleFactor(factor, factorIndex, i);
             }
-            if (factorValue !== undefined && factorValue !== null) {
+            if (factorValue !== undefined && factorValue !== null && factorValue !== 0 && factorValue !== '') {
               addmultiResult.push({ loadCaseName, sign, factor: factorValue });
             }
           });
@@ -2897,11 +2908,11 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
           const factor = value.factor;
           let factorValue;
     
-          if (factor !== undefined) {
+          if (factor !== undefined && factor !== null && factor !== '') {
             factorValue = getSingleFactor(factor, factorIndex, i);
           }
     
-          if (factorValue !== undefined && factorValue !== null) {
+          if (factorValue !== undefined && factorValue !== null && factorValue !== 0 && factorValue !== '') {
             addmultiResult.push({ loadCaseName, sign, factor: factorValue });
           }
         }
