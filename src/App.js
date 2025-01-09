@@ -2821,7 +2821,6 @@ for (let j = 0; j < 5; j++) {
       }
     });
   }
- 
 }
 if (iterationArray.length > 0) {
   mergeArray.push([...iterationArray]);
@@ -2917,10 +2916,10 @@ for (let factorIndex = 0; factorIndex < 5; factorIndex++) {
           }
         }
       });
-      // console.log(addmultiResult);
+      console.log(addmultiResult);
       return addmultiResult; 
     }
-    // console.log(finalResults);
+    console.log(finalResults);
   }
 }
 console.log(addresult);
@@ -2961,7 +2960,7 @@ inputCombination.forEach((mainArray,mainIndex) => {
           item.length > 0 &&
           item.every(subItem =>
             Array.isArray(subItem)
-              ? subItem.length > 0 &&
+              ? subItem.length > 0 ||
                 subItem.every(nestedItem => !Array.isArray(nestedItem) || nestedItem.length > 0)
               : true
           )
@@ -3028,7 +3027,7 @@ function flattenArray(arr) {
 }
 const fullyFlattenedCombinations = flattenedCombinations.map(array => flattenArray(array));
 console.log(fullyFlattenedCombinations);
-const joinedCombinations = [...fullyFlattenedCombinations, ...allCombinations];
+const joinedCombinations = [...fullyFlattenedCombinations];
 console.log(joinedCombinations);
 return joinedCombinations;
 }
@@ -3621,7 +3620,14 @@ const handleFileChange = (event) => {
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-    console.log('Raw JSON Data:', jsonData); 
+    console.log('Raw JSON Data:', jsonData);
+    if (!jsonData[0] || jsonData[0][0] !== "Load Combination" || jsonData[0][1] !== "Active" || jsonData[0][2] !== "Type" || jsonData[0][3] !== "Load Cases" || jsonData[0][4] !== "Sign" || jsonData[0][5] !== "Factor 1" || jsonData[0][6] !== "Factor 2" || jsonData[0][7] !== "Factor 3" || jsonData[0][8] !== "Factor 4" || jsonData[0][9] !== "Factor 5") {
+      enqueueSnackbar("Please upload the correct format of Excel file", {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "center" },
+      });
+      return; 
+    } 
     const formattedData = [];
     let currentLoadCombination = null;
     const loadcombinationName = [];
