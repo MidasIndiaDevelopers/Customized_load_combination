@@ -1260,7 +1260,21 @@ async function generateBasicCombinations(loadCombinations) {
      let joinedCombinations = [];
     for (let factor = 1; factor <= 5; factor++) {
       let factorCombinations = [];
+      if (strengthCombination.loadCases.length === 0) {
+        enqueueSnackbar("Please define Load Case for the selected Combination", {
+          variant: "error",
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+        return; 
+      }
     for (const loadCase of strengthCombination.loadCases) {
+      if (!loadCase.loadCaseName && strengthCombination.loadCases.length === 1) {
+        enqueueSnackbar("Please define Load Case for the selected Combination", {
+          variant: "error",
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+        return; 
+    }
       const factors = [];
       for (let factor = 1; factor <= 5; factor++) {
         const factorKey = `factor${factor}`;
@@ -2960,7 +2974,7 @@ inputCombination.forEach((mainArray,mainIndex) => {
           item.length > 0 &&
           item.every(subItem =>
             Array.isArray(subItem)
-              ? subItem.length > 0 ||
+              ? subItem.length > 0 &&
                 subItem.every(nestedItem => !Array.isArray(nestedItem) || nestedItem.length > 0)
               : true
           )
@@ -3027,7 +3041,7 @@ function flattenArray(arr) {
 }
 const fullyFlattenedCombinations = flattenedCombinations.map(array => flattenArray(array));
 console.log(fullyFlattenedCombinations);
-const joinedCombinations = [...fullyFlattenedCombinations];
+const joinedCombinations = [...fullyFlattenedCombinations, ...allCombinations];
 console.log(joinedCombinations);
 return joinedCombinations;
 }
