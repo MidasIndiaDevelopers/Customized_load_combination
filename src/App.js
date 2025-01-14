@@ -41,7 +41,7 @@ const [values, setValues] = useState({
 let [all_loadCaseNames,setall_loadCaseNames] = useState([]);
 const [exportLoading, setExportLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
-  const [generateLoading, setGenerateLoading] = useState(false);
+  const [buttonState, setButtonState] = useState("Generate Load Combination");
 const { enqueueSnackbar } = useSnackbar();
 
   const toggleLoadCaseDropdown = (index) => {
@@ -1252,13 +1252,14 @@ async function generateBasicCombinations(loadCombinations) {
   for (const strengthCombination of strengthCombinations) {
     combinationCounter =  combinationCounter + allFinalCombinations.length + env_count;
     allFinalCombinations = [];
-    let new_combo = [];
+    
     const comb_name = strengthCombination.loadCombination;
     const type = strengthCombination.type;
     const factorArray = [];
-    let result = [];  
+    
      let joinedCombinations = [];
     for (let factor = 1; factor <= 5; factor++) {
+      let new_combo = []; let result = [];  
       let factorCombinations = [];
       if (strengthCombination.loadCases.length === 0) {
         enqueueSnackbar("Please define Load Case for the selected Combination", {
@@ -1267,6 +1268,17 @@ async function generateBasicCombinations(loadCombinations) {
         });
         return; 
       }
+      const loadCaseNames = new Set();
+      for (const loadCase of strengthCombination.loadCases) {
+        if (loadCaseNames.has(loadCase.loadCaseName)) {
+          enqueueSnackbar("Duplicate Load Case Name are not allowed", {
+            variant: "error",
+            anchorOrigin: { vertical: "top", horizontal: "center" },
+          });
+          return; 
+        }
+        loadCaseNames.add(loadCase.loadCaseName);
+    }
     for (const loadCase of strengthCombination.loadCases) {
       if (!loadCase.loadCaseName && strengthCombination.loadCases.length === 1) {
         enqueueSnackbar("Please define Load Case for the selected Combination", {
@@ -1296,29 +1308,32 @@ async function generateBasicCombinations(loadCombinations) {
       const factorObject = factors.find(f => f.factor === factor);
       if (factorObject && factorObject.value !== undefined  && factorObject.value !== "") {
       const loadCaseName = loadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
-      if (factor === 1) {
+      // if (factor === 1) {
         if (loadNames.includes(loadCaseName)) {
           if (!result[type]) {
               result[type] = [];
           }
-          const factors = [
-              loadCase.factor1 || 0,
-              loadCase.factor2 || 0,
-              loadCase.factor3 || 0,
-              loadCase.factor4 || 0,
-              loadCase.factor5 || 0
-          ];
-          const nDimensionalArray = createNDimensionalArray(1, factors);
-          const uniqueFactors = [...new Set(nDimensionalArray)];
-          console.log("Created N-Dimensional Array:", uniqueFactors);
-          for (let i = 1; i <= 5; i++) {
-            delete loadCase[`factor${i}`];
-        }
+          let factors = Array(5).fill(0);
+for (let i = 0; i < 5; i++) {
+  if (i === factor - 1) {
+    factors[i] = loadCase[`factor${i + 1}`] || 0;
+  } else {
+    factors[i] = 0;
+  }
+}
+const nDimensionalArray = createNDimensionalArray(0, factors);
+// const uniqueFactors = [...new Set(nDimensionalArray)];
+// console.log("Created N-Dimensional Array:", uniqueFactors);
+        // for (let i = 1; i <= 5; i++) {
+        //    delete loadCase[`factor${i}`];
+        //  }
+        if (!loadCase.hasOwnProperty('factor')) {
         loadCase['factor'] = undefined;
-        loadCase.factor = uniqueFactors;
+        }
+        loadCase.factor = nDimensionalArray;
         new_combo.push(loadCase);
       }
-      } 
+      // } 
       if ((!loadNames.includes(loadCaseName))) {
           const sign = loadCase.sign || '+';
           const new_11 = createCombinations(type,loadCase, strengthCombination, loadCombinations, loadNames, [], factorObject.value, factor, sign);
@@ -1336,7 +1351,7 @@ async function generateBasicCombinations(loadCombinations) {
     if (new_combo.length > 0) {
     result[type].push([new_combo]);
     }
-    if (Object.keys(result).length > 0 && factor == 1) {
+    if (Object.keys(result).length > 0) {
       console.log(result);
       const result11 = combineAddEither([result]);
       console.log(result11);
@@ -3153,27 +3168,25 @@ function permutation_sign(result11) {
           }
         } else {
           if (new_temp.length > 0) {
-            for (const newItem of new_temp) {
-              if (positiveArray.length > 0 && negativeArray.length > 0) {
-                if (typeof newItem !== "object") {
-                temp.push([...positiveArray, ...newItem]);
-                temp.push([...negativeArray, ...newItem]);
-                } else {
-                  temp.push([...positiveArray]);
-                  temp.push([...negativeArray]);
-                }
-              } else {
-                temp.push(newItem);
-              }
+            const combinedNewItems = new_temp.flatMap(item => (typeof item === "object" ? [item] : item));
+            if (positiveArray.length > 0 && negativeArray.length > 0) {
+                temp.push([...positiveArray, ...combinedNewItems]);
+                temp.push([...negativeArray, ...combinedNewItems]);
+            } else if (positiveArray.length > 0) {
+                temp.push([...positiveArray, ...combinedNewItems]);
+            } else if (negativeArray.length > 0) {
+                temp.push([...negativeArray, ...combinedNewItems]);
+            } else {
+                temp.push(combinedNewItems);
             }
-          } else {
+        } else {
             if (positiveArray.length > 0) {
-              temp.push([...positiveArray]);
+                temp.push([...positiveArray]);
             }
             if (negativeArray.length > 0) {
-              temp.push([...negativeArray]);
+                temp.push([...negativeArray]);
             }
-          }
+        }
         }
         if (temp.length === 0) {
           innerArr.splice(objIndex, 1); // Remove the empty obj from innerArr
@@ -3390,26 +3403,30 @@ function permutation_sign(result11) {
 }
   
 async function Generate_Load_Combination() {
-  const cleanedLoadNames = all_loadCaseNames.map((name) =>
-    name.replace(/\s*\((CB|ST|CS|CBC|MV|RS|CBR|CBSC|CBS)\)$/, '')
-  );
-  const allIncluded = cleanedLoadNames.every((name) => loadNames.includes(name));
-  if (!allIncluded) {
-    enqueueSnackbar("Load cases are not defined", {
-      variant: "error",
-      anchorOrigin: { vertical: "top", horizontal: "center" },
-    });
-    return; 
+  setButtonState("Generating");
+  try {
+    const cleanedLoadNames = all_loadCaseNames.map((name) =>
+      name.replace(/\s*\((CB|ST|CS|CBC|MV|RS|CBR|CBSC|CBS)\)$/, '')
+    );
+    const allIncluded = cleanedLoadNames.every((name) => loadNames.includes(name));
+    if (!allIncluded) {
+      enqueueSnackbar("Load cases are not defined", {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "center" },
+      });
+      return; 
+    }
+    console.log(loadCombinations);
+    let uniqueFactorData = removeDuplicateFactors(loadCombinations);
+    setLoadCombinations(uniqueFactorData.filter((i)=>(i)));
+    console.log(uniqueFactorData.filter((i)=>(i)));
+    console.log(uniqueFactorData);
+    console.log(loadCombinations);
+    const basicCombinations = generateBasicCombinations(loadCombinations);
+    console.log(basicCombinations);
+  } finally {
+    setButtonState("Generate Load Combination");
   }
-  console.log(loadCombinations);
-  let uniqueFactorData = removeDuplicateFactors(loadCombinations);
-  setLoadCombinations(uniqueFactorData.filter((i)=>(i)));
-  console.log(uniqueFactorData.filter((i)=>(i)))
-  console.log(uniqueFactorData);
-  console.log(loadCombinations);
-  const basicCombinations = generateBasicCombinations(loadCombinations);
-  console.log(basicCombinations);
-  setGenerateLoading(false);
 }
 const isGeneratingRef = useRef(false);
 async function generateEnvelopeLoadCombination() {
@@ -3515,12 +3532,13 @@ const handleImportClick = () => {
   }, 5000); 
 } catch {
   console.error("Error importing excel file:", error);
-  if (snackbarCounter === 0) {
+  // if (snackbarCounter === 0) {
     enqueueSnackbar("Load Cases are not defined", {
-      key: `snackbar-${snackbarCounter++}`, 
+      // key: `snackbar-${snackbarCounter++}`, 
       variant: "error",
       anchorOrigin: { vertical: "top", horizontal: "center" },
-    });}
+    });
+  // }
 }
 };
 let [loadCombinations, setLoadCombinations] = useState(
@@ -3856,7 +3874,14 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
     }}> 
     <Scrollbars height={360} width={280}>
 
-               {loadCombinations.map((combo, index) => (
+               {loadCombinations.map((combo, index) => {
+                 if (combo.loadCombination && combo.loadCombination !== '---' && !combo.active) {
+                  combo.active = 'Strength';
+              }
+              if (combo.loadCombination && combo.loadCombination !== '---' && !combo.type) {
+                  combo.type = 'Add';
+              }
+              return (
       <div key={index} style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #ccc', cursor: 'pointer', backgroundColor: selectedLoadCombinationIndex === index ? '#f0f0f0' : 'white' }} onClick={() => handleLoadCombinationClick(index)}>
      <div style={{ flex: '0 0 110px', padding: '5px', borderRight: '1px solid #ccc', color: 'black', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
   {/* First div with input or Typography */}
@@ -3989,7 +4014,8 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
                       )}
                     </div>
                     </div>
-                ))}
+              );
+            })}
               </Scrollbars>
       </div>
       
@@ -4133,11 +4159,7 @@ const [activeDropdownIndex, setActiveDropdownIndex] = useState(-1);
   Buttons.SubButton("contained", "Import Load Combination", handleImportClick)
 )}
 
-{generateLoading ? (
-     Buttons.SubButton("contained", "Generating")
-) : (
-  Buttons.SubButton("contained", "Generate Load Combination", Generate_Load_Combination)
-)}
+{Buttons.SubButton("contained", buttonState, Generate_Load_Combination)}
 
       </div>
       <ExcelReader onImport={importLoadCombinationInput} handleFileChange={handleFileChange} />
