@@ -3421,15 +3421,16 @@ async function Generate_Load_Combination() {
   });
   setIsGenerating((pre)=>true);
   console.log("Generating Load Combination", isGenerating);
-    const cleanedLoadNames = all_loadCaseNames.map((name) =>
+    let cleanedLoadNames = all_loadCaseNames.map((name) =>
       name.replace(/\s*\((CB|ST|CS|CBC|MV|RS|CBR|CBSC|CBS)\)$/, '')
     );
-    const allIncluded = cleanedLoadNames.every((name) => loadNames.includes(name));
+    let allIncluded = cleanedLoadNames.every((name) => loadNames.includes(name));
     if (!allIncluded) {
       enqueueSnackbar("Load cases are not defined", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "center" },
       });
+      setIsGenerating(false);
       return; 
     }
     console.log(loadCombinations);
@@ -3444,7 +3445,6 @@ async function Generate_Load_Combination() {
       console.log("Generating Load Combination3", isGenerating);
     });
     setIsGenerating((pre)=>false);
- 
 }
 
 console.log("Generating Load Combination2", isGenerating);
@@ -3513,6 +3513,7 @@ async function generateEnvelopeLoadCombination() {
     });
   } finally {
     isGeneratingRef.current = false; 
+    setIsGenerating(false);
     civilCom.Assign = {};
     civilComEnv.Assign = {};
     civilComEnvValues.Assign = {};
@@ -3550,7 +3551,7 @@ const handleImportClick = () => {
   setTimeout(() => {
     setImportLoading(false); 
   }, 5000); 
-} catch {
+} catch(error) {
   console.error("Error importing excel file:", error);
   // if (snackbarCounter === 0) {
     enqueueSnackbar("Load Cases are not defined", {
@@ -3663,6 +3664,7 @@ let removeDuplicateFactors = (data) => {
 };
 
 const handleFileChange = (event) => {
+  all_loadCaseNames = [];
   const file = event.target.files[0];
   const reader = new FileReader();
 
