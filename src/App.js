@@ -552,6 +552,9 @@ else if (dimension > 2) {
             } else {
                currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
             }
+            if (currentFactorValue === undefined && eitherLoadCase[`factor${factorIndex}`] !== undefined) {
+              currentFactorValue = eitherLoadCase[`factor${factorIndex}`];
+            };
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, eitherLoadCase.sign || '+');
             const eitherLoadCaseName = eitherLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
@@ -638,6 +641,9 @@ else if (dimension > 2) {
             } else {
                currentFactorValue = addLoadCase[`factor${factorIndex}`];
             }
+            if (currentFactorValue === undefined && addLoadCase[`factor${factorIndex}`] !== undefined) {
+              currentFactorValue = addLoadCase[`factor${factorIndex}`];
+            };
             if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, addLoadCase.sign || '+');
             const addLoadCaseName = addLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, '');
@@ -717,6 +723,9 @@ if (typeof factorKey === "number") {
              } else {
                 currentFactorValue = envelopeLoadCase[`factor${factorIndex}`];
              }
+             if (currentFactorValue === undefined && envelopeLoadCase[`factor${factorIndex}`] !== undefined) {
+              currentFactorValue = envelopeLoadCase[`factor${factorIndex}`];
+            };
              if (currentFactorValue === undefined) return;
             const newSign = multiplySigns(sign, envelopeLoadCase.sign || '+');
             if (loadNames.includes(envelopeLoadCase.loadCaseName.replace(/\s*\((CB|ST|CS|CBC|MV|SM|RS|CBR|CBSC|CBS)\)$/, ''))) {
@@ -3434,10 +3443,10 @@ async function Generate_Load_Combination() {
       return; 
     }
     console.log(loadCombinations);
-    let uniqueFactorData = removeDuplicateFactors(loadCombinations);
-    setLoadCombinations(uniqueFactorData.filter((i)=>(i)));
-    console.log(uniqueFactorData.filter((i)=>(i)));
-    console.log(uniqueFactorData);
+    // let uniqueFactorData = removeDuplicateFactors(loadCombinations);
+    // setLoadCombinations(uniqueFactorData.filter((i)=>(i)));
+    // console.log(uniqueFactorData.filter((i)=>(i)));
+    // console.log(uniqueFactorData);
     console.log(loadCombinations);
     const basicCombinations = generateBasicCombinations(loadCombinations);
     console.log(basicCombinations);
@@ -3513,7 +3522,6 @@ async function generateEnvelopeLoadCombination() {
     });
   } finally {
     isGeneratingRef.current = false; 
-    setIsGenerating(false);
     civilCom.Assign = {};
     civilComEnv.Assign = {};
     civilComEnvValues.Assign = {};
@@ -3551,7 +3559,7 @@ const handleImportClick = () => {
   setTimeout(() => {
     setImportLoading(false); 
   }, 5000); 
-} catch(error) {
+} catch {
   console.error("Error importing excel file:", error);
   // if (snackbarCounter === 0) {
     enqueueSnackbar("Load Cases are not defined", {
@@ -3611,8 +3619,8 @@ useEffect(() => {
     setInputValue('');
   }
 }, [loadCombinations]);
-let removeDuplicateFactors = (data) => {
-  return data.map((combination) => {
+const removeDuplicateFactors = (data) => {
+  const updatedData = data.map((combination) => {
     if (combination?.type === "Either" || combination?.type === "Envelope") {
       const updatedLoadCases = combination.loadCases.map((loadCase) => {
         const factors = [
@@ -3636,8 +3644,7 @@ let removeDuplicateFactors = (data) => {
         ...combination,
         loadCases: updatedLoadCases,
       };
-    } 
-    if (combination?.type === "Add") {
+    } else{
       const updatedLoadCases = combination.loadCases.map((loadCase) => {
         const factors = [
           loadCase.factor1,
@@ -3652,7 +3659,7 @@ let removeDuplicateFactors = (data) => {
           factor2: loadCase.factor2,
           factor3: loadCase.factor3,
           factor4: loadCase.factor4,
-          factor5: loadCase.factor5
+          factor5: loadCase.factor5,
         };
       });
       return {
@@ -3661,10 +3668,14 @@ let removeDuplicateFactors = (data) => {
       };
     }
   });
+
+  // Update the state with the updated data
+  setLoadCombinations(updatedData);
+
+  return updatedData;
 };
 
 const handleFileChange = (event) => {
-  all_loadCaseNames = [];
   const file = event.target.files[0];
   const reader = new FileReader();
 
